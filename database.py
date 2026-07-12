@@ -15,6 +15,11 @@ logger = logging.getLogger(__name__)
 MONGODB_URI = os.environ.get("MONGODB_URI", "mongodb://localhost:27017")
 MONGODB_DATABASE = os.environ.get("MONGODB_DATABASE", "video_cover_bot")
 
+# For Render: Handle MongoDB Atlas URI properly
+if MONGODB_URI and "mongodb+srv" in MONGODB_URI:
+    # MongoDB Atlas connection - no additional options needed
+    pass
+
 try:
     mongo_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
     db = mongo_client[MONGODB_DATABASE]
@@ -310,4 +315,3 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
     action = "🗑️ Thumbnail Removed"
     logger.info(f"✅ {action} - {username} ({user_id})")
     return create_log_entry(user_id, username, action)
-
