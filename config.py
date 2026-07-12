@@ -16,7 +16,6 @@ if load_dotenv:
     else:
         load_dotenv()
 
-# For Render: Also load environment variables directly
 # Expose all environment variables as attributes on `config`
 _config = {k: v for k, v in os.environ.items()}
 config = SimpleNamespace(**_config)

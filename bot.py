@@ -24,26 +24,6 @@ from database import (
 )
 from telegram import MessageEntity
 
-# ===== RENDER COMPATIBILITY =====
-import threading
-from flask import Flask
-
-# Create Flask app for health checks
-flask_app = Flask(__name__)
-
-@flask_app.route('/')
-def health_check():
-    return "✅ Bot is running!", 200
-
-@flask_app.route('/health')
-def health():
-    return "OK", 200
-
-def run_flask():
-    port = int(os.environ.get('PORT', 10000))
-    flask_app.run(host='0.0.0.0', port=port)
-# ===== END RENDER COMPATIBILITY =====
-
 def bold_entities(text: str):
     """Return entities list to make full caption bold"""
     if not text:
@@ -1247,9 +1227,6 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action_text = "ᴜᴘᴅᴀᴛᴇᴅ" if is_replace else "sᴀᴠᴇᴅ"
     await update.message.reply_text("✅ ᴛʜᴜᴍʙɴᴀɪʟ " + action_text + "\n\nʀᴇᴀᴅʏ! sᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ ᴛᴏ ᴀᴘᴘʟʏ ᴄᴏᴠᴇʀ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
-# ============================================================
-# FIXED VIDEO HANDLER - Removed unsupported 'cover' parameter
-# ============================================================
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1258,29 +1235,20 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cover = get_thumbnail(user_id)
     if not cover:
         return await update.message.reply_text("❌ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏᴜɴᴅ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴛʜᴜᴍʙɴᴀɪʟ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
-    
     msg = await update.message.reply_text("⏳ ᴘʀᴏᴄᴇssɪɴɢ ᴠɪᴅᴇᴏ\n\nᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ sᴇᴄᴏɴᴅs", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
     video = update.message.video.file_id
     
-    # Get original caption
+    # Get original caption and preserve it
     original_caption = update.message.caption or ""
     new_caption = original_caption
     caption_entities = bold_entities(original_caption)
     
+    media = InputMediaVideo(media=video, caption=new_caption,caption_entities=caption_entities, supports_streaming=True, cover=cover)
+    
     try:
-        # Delete the processing message
-        await msg.delete()
-        
-        # Send video with thumbnail using send_video (supports thumbnail parameter)
-        await context.bot.send_video(
-            chat_id=update.effective_chat.id,
-            video=video,
-            caption=new_caption,
-            supports_streaming=True,
-            thumbnail=cover,
-            parse_mode="HTML"
-        )
+        # Edit message with video and cover
+        await context.bot.edit_message_media(chat_id=update.effective_chat.id, message_id=msg.message_id, media=media)
         
         # Forward video to log channel
         if LOG_CHANNEL_ID:
@@ -1304,7 +1272,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"❌ Error forwarding video to log channel: {e}")
     except Exception as e:
-        logger.error(f"Video processing error: {e}")
         await update.message.reply_text("❌ ᴘʀᴏᴄᴇssɪɴɢ ꜰᴀɪʟᴇᴅ\n\nᴇʀʀᴏʀ: " + str(e)[:50], parse_mode="HTML")
 
 
@@ -1514,18 +1481,18 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = (
             "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\n\n"
-            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n"
-            f"⏰ ᴜᴘᴛɪᴍᴇ: {uptime_hours}ʜ {uptime_mins}ᴍ\n\n"
-            f"🖥 sʏsᴛᴇᴍ ʀᴇsᴏᴜʀᴄᴇs:\n"
-            f"🔴 ᴄᴘᴜ: {cpu_percent}%\n"
+            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\\n"
+            f"⏰ ᴜᴘᴛɪᴍᴇ: {uptime_hours}ʜ {uptime_mins}ᴍ\\n\\n"
+            f"🖥 sʏsᴛᴇᴍ ʀᴇsᴏᴜʀᴄᴇs:\\n"
+            f"🔴 ᴄᴘᴜ: {cpu_percent}%\\n"
             f"🟡 ʀᴀᴍ: {ram_percent}% ({ram.used // (1024**2)} ᴍʙ / {ram.total // (1024**2)} ᴍʙ)"
         )
         await update.message.reply_text(text, parse_mode="HTML")
     except ImportError:
         text = (
-            "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\n\n"
-            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n\n"
-            "⚠️ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ ꜰᴏʀ sʏsᴛᴇᴍ sᴛᴀᴛs\n"
+            "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\\n\\n"
+            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\\n\\n"
+            "⚠️ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ ꜰᴏʀ sʏsᴛᴇᴍ sᴛᴀᴛs\\n"
             "📦 ʀᴜɴ: ᴘɪᴘ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ"
         )
         await update.message.reply_text(text, parse_mode="HTML")
@@ -1542,10 +1509,10 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         return await update.message.reply_text(
             "❌ ᴜsᴀɢᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ <ᴍᴇssᴀɢᴇ>\n\n"
-            "📌 ᴇxᴀᴍᴘʟᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ ʜᴇʟʟᴏ ᴇᴠᴇʀʏᴏɴᴇ!\n\n"
-            "💡 ᴛɪᴘs:\n"
-            "• ᴍᴇssᴀɢᴇ sᴇɴᴛ ᴛᴏ ᴀʟʟ ᴜsᴇʀs\n"
-            "• ʜᴛᴍʟ ꜰᴏʀᴍᴀᴛᴛɪɴɢ sᴜᴘᴘᴏʀᴛᴇᴅ\n"
+            "📌 ᴇxᴀᴍᴘʟᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ ʜᴇʟʟᴏ ᴇᴠᴇʀʏᴏɴᴇ!\\n\\n"
+            "💡 ᴛɪᴘs:\\n"
+            "• ᴍᴇssᴀɢᴇ sᴇɴᴛ ᴛᴏ ᴀʟʟ ᴜsᴇʀs\\n"
+            "• ʜᴛᴍʟ ꜰᴏʀᴍᴀᴛᴛɪɴɢ sᴜᴘᴘᴏʀᴛᴇᴅ\\n"
             "• ᴇᴍᴏᴊɪs ᴡᴏʀᴋ ɢʀᴇᴀᴛ ᴛᴏᴏ",
             parse_mode="HTML"
         )
@@ -1555,7 +1522,7 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Show confirmation
     confirm_text = (
         "📢 ʙʀᴏᴀᴅᴄᴀsᴛ ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ\n\n"
-        f"📝 ᴍᴇssᴀɢᴇ:\n"
+        f"📝 ᴍᴇssᴀɢᴇ:\\n"
         f"{message_text}\n\n"
         f"👥 ᴛᴏᴛᴀʟ ᴜsᴇʀs: {get_total_users()}\n\n"
         "⚠️ ᴘʀᴏᴄᴇssɪɴɢ... sᴇɴᴅɪɴɢ ɴᴏᴡ"
@@ -1618,8 +1585,8 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         await msg.edit_text(
-            f"❌ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴀɪʟᴇᴅ\n\n"
-            f"ᴇʀʀᴏʀ: {str(e)[:100]}\n\n"
+            f"❌ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴀɪʟᴇᴅ\\n\\n"
+            f"ᴇʀʀᴏʀ: {str(e)[:100]}\\n\\n"
             "ᴄʜᴇᴄᴋ ʟᴏɢs ꜰᴏʀ ᴅᴇᴛᴀɪʟs.",
             parse_mode="HTML"
         )
@@ -1635,7 +1602,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Ignore all text messages (don't respond)
 
 
-"""-----------CALLBACK HANDLERS--------"""
+"""-----------CALLBAck Hnadlers--------"""
 
 
 def main() -> None:
@@ -1704,13 +1671,6 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(callback_handler))
 
     logger.info("✅ All handlers registered")
-    
-    # ===== START FLASK SERVER FOR RENDER HEALTH CHECKS =====
-    port = int(os.environ.get('PORT', 10000))
-    threading.Thread(target=run_flask, daemon=True).start()
-    logger.info(f"✅ Health check server running on port {port}")
-    # ===== END RENDER COMPATIBILITY =====
-    
     logger.info("Bot starting (polling)")
     app.run_polling(
         allowed_updates=[
