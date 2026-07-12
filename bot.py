@@ -24,6 +24,26 @@ from database import (
 )
 from telegram import MessageEntity
 
+# ===== RENDER COMPATIBILITY =====
+import threading
+from flask import Flask
+
+# Create Flask app for health checks
+flask_app = Flask(__name__)
+
+@flask_app.route('/')
+def health_check():
+    return "✅ Bot is running!", 200
+
+@flask_app.route('/health')
+def health():
+    return "OK", 200
+
+def run_flask():
+    port = int(os.environ.get('PORT', 10000))
+    flask_app.run(host='0.0.0.0', port=port)
+# ===== END RENDER COMPATIBILITY =====
+
 def bold_entities(text: str):
     """Return entities list to make full caption bold"""
     if not text:
@@ -1481,18 +1501,18 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = (
             "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\n\n"
-            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\\n"
-            f"⏰ ᴜᴘᴛɪᴍᴇ: {uptime_hours}ʜ {uptime_mins}ᴍ\\n\\n"
-            f"🖥 sʏsᴛᴇᴍ ʀᴇsᴏᴜʀᴄᴇs:\\n"
-            f"🔴 ᴄᴘᴜ: {cpu_percent}%\\n"
+            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n"
+            f"⏰ ᴜᴘᴛɪᴍᴇ: {uptime_hours}ʜ {uptime_mins}ᴍ\n\n"
+            f"🖥 sʏsᴛᴇᴍ ʀᴇsᴏᴜʀᴄᴇs:\n"
+            f"🔴 ᴄᴘᴜ: {cpu_percent}%\n"
             f"🟡 ʀᴀᴍ: {ram_percent}% ({ram.used // (1024**2)} ᴍʙ / {ram.total // (1024**2)} ᴍʙ)"
         )
         await update.message.reply_text(text, parse_mode="HTML")
     except ImportError:
         text = (
-            "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\\n\\n"
-            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\\n\\n"
-            "⚠️ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ ꜰᴏʀ sʏsᴛᴇᴍ sᴛᴀᴛs\\n"
+            "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\n\n"
+            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n\n"
+            "⚠️ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ ꜰᴏʀ sʏsᴛᴇᴍ sᴛᴀᴛs\n"
             "📦 ʀᴜɴ: ᴘɪᴘ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ"
         )
         await update.message.reply_text(text, parse_mode="HTML")
@@ -1509,10 +1529,10 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         return await update.message.reply_text(
             "❌ ᴜsᴀɢᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ <ᴍᴇssᴀɢᴇ>\n\n"
-            "📌 ᴇxᴀᴍᴘʟᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ ʜᴇʟʟᴏ ᴇᴠᴇʀʏᴏɴᴇ!\\n\\n"
-            "💡 ᴛɪᴘs:\\n"
-            "• ᴍᴇssᴀɢᴇ sᴇɴᴛ ᴛᴏ ᴀʟʟ ᴜsᴇʀs\\n"
-            "• ʜᴛᴍʟ ꜰᴏʀᴍᴀᴛᴛɪɴɢ sᴜᴘᴘᴏʀᴛᴇᴅ\\n"
+            "📌 ᴇxᴀᴍᴘʟᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ ʜᴇʟʟᴏ ᴇᴠᴇʀʏᴏɴᴇ!\n\n"
+            "💡 ᴛɪᴘs:\n"
+            "• ᴍᴇssᴀɢᴇ sᴇɴᴛ ᴛᴏ ᴀʟʟ ᴜsᴇʀs\n"
+            "• ʜᴛᴍʟ ꜰᴏʀᴍᴀᴛᴛɪɴɢ sᴜᴘᴘᴏʀᴛᴇᴅ\n"
             "• ᴇᴍᴏᴊɪs ᴡᴏʀᴋ ɢʀᴇᴀᴛ ᴛᴏᴏ",
             parse_mode="HTML"
         )
@@ -1522,7 +1542,7 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Show confirmation
     confirm_text = (
         "📢 ʙʀᴏᴀᴅᴄᴀsᴛ ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ\n\n"
-        f"📝 ᴍᴇssᴀɢᴇ:\\n"
+        f"📝 ᴍᴇssᴀɢᴇ:\n"
         f"{message_text}\n\n"
         f"👥 ᴛᴏᴛᴀʟ ᴜsᴇʀs: {get_total_users()}\n\n"
         "⚠️ ᴘʀᴏᴄᴇssɪɴɢ... sᴇɴᴅɪɴɢ ɴᴏᴡ"
@@ -1585,8 +1605,8 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         await msg.edit_text(
-            f"❌ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴀɪʟᴇᴅ\\n\\n"
-            f"ᴇʀʀᴏʀ: {str(e)[:100]}\\n\\n"
+            f"❌ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴀɪʟᴇᴅ\n\n"
+            f"ᴇʀʀᴏʀ: {str(e)[:100]}\n\n"
             "ᴄʜᴇᴄᴋ ʟᴏɢs ꜰᴏʀ ᴅᴇᴛᴀɪʟs.",
             parse_mode="HTML"
         )
@@ -1671,6 +1691,13 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(callback_handler))
 
     logger.info("✅ All handlers registered")
+    
+    # ===== START FLASK SERVER FOR RENDER HEALTH CHECKS =====
+    port = int(os.environ.get('PORT', 10000))
+    threading.Thread(target=run_flask, daemon=True).start()
+    logger.info(f"✅ Health check server running on port {port}")
+    # ===== END RENDER COMPATIBILITY =====
+    
     logger.info("Bot starting (polling)")
     app.run_polling(
         allowed_updates=[
