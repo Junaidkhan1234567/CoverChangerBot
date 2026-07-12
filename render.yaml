@@ -1,7 +1,9 @@
 services:
   - type: web
     name: video-cover-bot
-    env: python
+    runtime: python
+    plan: free
+    autoDeploy: true
     buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
     envVars:
@@ -16,15 +18,10 @@ services:
       - key: MONGODB_URI
         sync: false
       - key: MONGODB_DATABASE
-        sync: false
-      - key: HOME_MENU_BANNER_URL
+        value: video_cover_bot
+      - key: OWNER_USERNAME
         sync: false
       - key: FORCE_SUB_BANNER_URL
         sync: false
-      - key: OWNER_USERNAME
+      - key: HOME_MENU_BANNER_URL
         sync: false
-      - key: UPSTREAM_REPO
-        sync: false
-      - key: UPSTREAM_BRANCH
-        sync: false
-    plan: free
