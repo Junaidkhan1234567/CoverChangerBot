@@ -1,6 +1,4 @@
 import os
-from flask import Flask
-import threading
 import logging
 import asyncio
 from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
@@ -25,6 +23,19 @@ from database import (
     log_thumbnail_set, log_thumbnail_removed
 )
 from telegram import MessageEntity
+# Import at top
+from flask import Flask
+import threading
+
+# Flask app for health check
+app = Flask(__name__)
+
+@app.route('/')
+def health():
+    return "Bot is running!", 200
+
+def run_web():
+    app.run(host='0.0.0.0', port=8080)
 
 def bold_entities(text: str):
     """Return entities list to make full caption bold"""
