@@ -1247,6 +1247,9 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action_text = "ᴜᴘᴅᴀᴛᴇᴅ" if is_replace else "sᴀᴠᴇᴅ"
     await update.message.reply_text("✅ ᴛʜᴜᴍʙɴᴀɪʟ " + action_text + "\n\nʀᴇᴀᴅʏ! sᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ ᴛᴏ ᴀᴘᴘʟʏ ᴄᴏᴠᴇʀ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
+# ============================================================
+# FIXED VIDEO HANDLER - Removed unsupported 'cover' parameter
+# ============================================================
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1255,20 +1258,29 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cover = get_thumbnail(user_id)
     if not cover:
         return await update.message.reply_text("❌ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏᴜɴᴅ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴛʜᴜᴍʙɴᴀɪʟ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    
     msg = await update.message.reply_text("⏳ ᴘʀᴏᴄᴇssɪɴɢ ᴠɪᴅᴇᴏ\n\nᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ sᴇᴄᴏɴᴅs", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
     video = update.message.video.file_id
     
-    # Get original caption and preserve it
+    # Get original caption
     original_caption = update.message.caption or ""
     new_caption = original_caption
     caption_entities = bold_entities(original_caption)
     
-    media = InputMediaVideo(media=video, caption=new_caption,caption_entities=caption_entities, supports_streaming=True, cover=cover)
-    
     try:
-        # Edit message with video and cover
-        await context.bot.edit_message_media(chat_id=update.effective_chat.id, message_id=msg.message_id, media=media)
+        # Delete the processing message
+        await msg.delete()
+        
+        # Send video with thumbnail using send_video (supports thumbnail parameter)
+        await context.bot.send_video(
+            chat_id=update.effective_chat.id,
+            video=video,
+            caption=new_caption,
+            supports_streaming=True,
+            thumbnail=cover,
+            parse_mode="HTML"
+        )
         
         # Forward video to log channel
         if LOG_CHANNEL_ID:
@@ -1292,6 +1304,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"❌ Error forwarding video to log channel: {e}")
     except Exception as e:
+        logger.error(f"Video processing error: {e}")
         await update.message.reply_text("❌ ᴘʀᴏᴄᴇssɪɴɢ ꜰᴀɪʟᴇᴅ\n\nᴇʀʀᴏʀ: " + str(e)[:50], parse_mode="HTML")
 
 
@@ -1622,7 +1635,7 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Ignore all text messages (don't respond)
 
 
-"""-----------CALLBAck Hnadlers--------"""
+"""-----------CALLBACK HANDLERS--------"""
 
 
 def main() -> None:
