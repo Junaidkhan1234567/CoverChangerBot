@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 MONGODB_URI = os.environ.get("MONGODB_URI", "mongodb://localhost:27017")
 MONGODB_DATABASE = os.environ.get("MONGODB_DATABASE", "video_cover_bot")
 
+# MongoDB Atlas ke liye connection timeout badhao:
+mongo_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=10000)
 try:
     mongo_client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
     db = mongo_client[MONGODB_DATABASE]
