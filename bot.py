@@ -1612,22 +1612,16 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """-----------MAIN FUNCTION WITH DEPLOY LOG-----------"""
 
 async def post_init(app: Application):
-    """✅ Bot start/deploy hone par ye log channel mein message bhejega"""
+    """✅ Bot start/deploy hone par simple log bhejega"""
     logger.info("🚀 Bot is starting up...")
     
     if LOG_CHANNEL_ID:
         try:
-            # Deploy/Startup log message
+            # ✅ SIMPLE DEPLOY LOG - Sirf ek baar bhejega
             deploy_message = (
-                "🚀 <b>Bot Deployed Successfully!</b>\n\n"
-                "✅ Bot is now online and running.\n"
-                "📊 Monitoring all user activities.\n"
-                "🟢 Status: <b>Active</b>\n\n"
+                "🚀 <b>Bot is Live</b>\n\n"
                 f"📅 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                "🤖 Bot: @CoverChangerBot\n"
-                "👑 Owner: @WOLVERIN_P\n\n"
-                "─" * 20 + "\n"
-                "<i>All user activities will be logged here.</i>"
+                f"👑 Owner: @{OWNER_USERNAME or 'Owner'}"
             )
             
             await app.bot.send_message(
@@ -1635,10 +1629,10 @@ async def post_init(app: Application):
                 text=deploy_message,
                 parse_mode="HTML"
             )
-            logger.info("✅ Deploy log sent successfully to channel")
+            logger.info("✅ Deploy log sent")
+            
         except Exception as e:
-            logger.error(f"❌ Failed to send deploy log: {e}")
-            logger.error(f"Channel ID: {LOG_CHANNEL_ID}")
+            logger.error(f"❌ Deploy log failed: {e}")
     
     # Setup bot commands
     try:
