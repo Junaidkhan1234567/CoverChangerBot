@@ -935,11 +935,7 @@ async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   ʏᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ sᴀᴠᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ\n\n"
         "🎥 sᴇɴᴅ ᴠɪᴅᴇᴏ\n"
         "   ᴛʜᴜᴍʙɴᴀɪʟ ᴀᴘᴘʟɪᴇs ɪɴsᴛᴀɴᴛʟʏ\n\n"
-        "ᴋᴇʏ ꜰᴇᴀᴛᴜʀᴇs:\n"
-        "✅ ᴏɴᴇ-ᴄʟɪᴄᴋ ᴀᴘᴘʟɪᴄᴀᴛɪᴏɴ\n"
-        "✅ ʜɪɢʜ-ǫᴜᴀʟɪᴛʏ ᴄᴏᴠᴇʀs\n"
-        "✅ ᴀᴜᴛᴏᴍᴀᴛɪᴄ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ\n\n"
-        "ᴄᴏᴍᴍᴀɴᴅs:\n"
+        "ᴋᴇʏ ꜰᴇᴀᴛᴜʀᴇs:\n\n"
         "/showthumbnail – Show Thumbnail"
     )
 
@@ -1047,11 +1043,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "   ʏᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ sᴀᴠᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ\n\n"
         "🎥 sᴇɴᴅ ᴠɪᴅᴇᴏ\n"
         "   ᴛʜᴜᴍʙɴᴀɪʟ ᴀᴘᴘʟɪᴇs ɪɴsᴛᴀɴᴛʟʏ\n\n"
-        "ᴋᴇʏ ꜰᴇᴀᴛᴜʀᴇs:\n"
-        "✅ ᴏɴᴇ-ᴄʟɪᴄᴋ ᴀᴘᴘʟɪᴄᴀᴛɪᴏɴ\n"
-        "✅ ʜɪɢʜ-ǫᴜᴀʟɪᴛʏ ᴄᴏᴠᴇʀs\n"
-        "✅ ᴀᴜᴛᴏᴍᴀᴛɪᴄ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ\n\n"
-        "ᴄᴏᴍᴍᴀɴᴅs:\n"
+        "ᴋᴇʏ ꜰᴇᴀᴛᴜʀᴇs:\n\n"
         "/showthumbnail – Show Thumbnail"
     )
 
