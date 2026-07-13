@@ -928,16 +928,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-        "<b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ɪɴsᴛᴀɴᴛ ᴄᴏᴠᴇʀ ʙᴏᴛ</b>\n\n"
-        "🎬 ᴘʀᴏꜰᴇssɪᴏɴᴀʟ ᴠɪᴅᴇᴏ ᴄᴏᴠᴇʀ ᴛᴏᴏʟ\n\n"
-        "ǫᴜɪᴄᴋ sᴛᴀʀᴛ:\n\n"
-        "📸 ᴜᴘʟᴏᴀᴅ ᴘʜᴏᴛᴏ\n"
-        "   ʏᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ sᴀᴠᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ\n\n"
-        "🎥 sᴇɴᴅ ᴠɪᴅᴇᴏ\n"
-        "   ᴛʜᴜᴍʙɴᴀɪʟ ᴀᴘᴘʟɪᴇs ɪɴsᴛᴀɴᴛʟʏ\n\n"
-        "ᴋᴇʏ ꜰᴇᴀᴛᴜʀᴇs:\n\n"
-        "/showthumbnail – Show Thumbnail"
-    )
+    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+    "• Send/forward Cover Photo → Save cover\n"
+    "• Send/forward video → Apply cover\n"
+    "• /showthumbnail → View your current cover\n\n"
+    "📊 The bot never offline unless maintenance or admin intervention."
+)
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="menu_help"),
@@ -1036,16 +1032,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     text = (
-        "<b>ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ɪɴsᴛᴀɴᴛ ᴄᴏᴠᴇʀ ʙᴏᴛ</b>\n\n"
-        "🎬 ᴘʀᴏꜰᴇssɪᴏɴᴀʟ ᴠɪᴅᴇᴏ ᴄᴏᴠᴇʀ ᴛᴏᴏʟ\n\n"
-        "ǫᴜɪᴄᴋ sᴛᴀʀᴛ:\n\n"
-        "📸 ᴜᴘʟᴏᴀᴅ ᴘʜᴏᴛᴏ\n"
-        "   ʏᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ sᴀᴠᴇs ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ\n\n"
-        "🎥 sᴇɴᴅ ᴠɪᴅᴇᴏ\n"
-        "   ᴛʜᴜᴍʙɴᴀɪʟ ᴀᴘᴘʟɪᴇs ɪɴsᴛᴀɴᴛʟʏ\n\n"
-        "ᴋᴇʏ ꜰᴇᴀᴛᴜʀᴇs:\n\n"
-        "/showthumbnail – Show Thumbnail"
-    )
+    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+    "• Send/forward Cover Photo → Save cover\n"
+    "• Send/forward video → Apply cover\n"
+    "• /showthumbnail → View your current cover\n\n"
+    "📊 The bot never offline unless maintenance or admin intervention."
+)
 
     # Build home menu with all buttons
     kb_rows = [
