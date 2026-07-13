@@ -1636,21 +1636,15 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 """-----------MAIN FUNCTION-----------"""
-
 def main() -> None:
-    # Application builder
     application = Application.builder().token(TOKEN).build()
 
-    # Global error handler
     async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"🔴 ERROR: {context.error}", exc_info=context.error)
-
     application.add_error_handler(error_handler)
     
-    # Setup bot commands on startup
     async def setup_commands(app: Application) -> None:
         from telegram import BotCommand
-        
         commands = [
             BotCommand("start", "🏠 Start bot"),
             BotCommand("help", "ℹ️ How to use bot"),
@@ -1664,60 +1658,19 @@ def main() -> None:
             BotCommand("status", "⏱️ Bot status"),
             BotCommand("broadcast", "📢 Broadcast message"),
         ]
-        
         try:
             await app.bot.set_my_commands(commands)
             logger.info("✅ Bot commands configured successfully")
         except Exception as e:
             logger.error(f"❌ Error setting bot commands: {e}")
     
-    # Register post_init callback to setup commands
-    application.post_init = setup_commands
-
-    # Command handlers
-    application.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("about", about, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("settings", settings, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("remove", remover, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("restart", restart, filters=filters.ChatType.PRIVATE))
-    
-    # Admin commands
-    application.add_handler(CommandHandler("admin", admin_menu, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("ban", ban_cmd, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("unban", unban_cmd, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("stats", stats_cmd, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("status", status_cmd, filters=filters.ChatType.PRIVATE))
-    application.add_handler(CommandHandler("broadcast", broadcast_cmd, filters=filters.ChatType.PRIVATE))
-
-    # Photo and video handlers (private chats only via filters)
-    application.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, photo_handler))
-    application.add_handler(MessageHandler(filters.VIDEO & filters.ChatType.PRIVATE, video_handler))
-    
-    # Text handler for dump channel ID capture (MUST be LAST - only non-command text)
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, text_handler))
-    
-    # Register callback handler (handles all callbacks)
-    application.add_handler(CallbackQueryHandler(callback_handler))
-
-    logger.info("✅ All handlers registered")
-
-    # ⭐⭐⭐ WEBHOOK SETUP - RENDER.COM ⭐⭐⭐
-    WEBHOOK_URL = "https://coverchangerbot.onrender.com"
-    WEBHOOK_PATH = "/webhook"
-    
-    logger.info(f"🚀 Starting bot in WEBHOOK mode on Render.com...")
-    logger.info(f"📡 Webhook URL: {WEBHOOK_URL}{WEBHOOK_PATH}")
-
-    # Setup webhook properly with await
-    async def setup_webhook():
+    async def setup_webhook(app: Application) -> None:
+        WEBHOOK_URL = "https://coverchangerbot.onrender.com"
+        WEBHOOK_PATH = "/webhook"
         try:
-            # Delete old webhook
-            await application.bot.delete_webhook(drop_pending_updates=True)
+            await app.bot.delete_webhook(drop_pending_updates=True)
             logger.info("✅ Old webhook deleted")
-            
-            # Set new webhook
-            await application.bot.set_webhook(
+            await app.bot.set_webhook(
                 url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
                 allowed_updates=["message", "callback_query"],
             )
@@ -1725,13 +1678,25 @@ def main() -> None:
         except Exception as e:
             logger.error(f"❌ Webhook setup error: {e}")
     
-    # Run webhook setup
-    asyncio.run(setup_webhook())
+    async def post_init(app: Application) -> None:
+        await setup_commands(app)
+        await setup_webhook(app)
+    
+    application.post_init = post_init
 
-    # Run bot with webhook
+    # ... सारे handlers (start, help, about, settings, remove, restart, admin, ban, unban, stats, status, broadcast, photo, video, text, callback) ...
+
+    logger.info("✅ All handlers registered")
+
+    WEBHOOK_URL = "https://coverchangerbot.onrender.com"
+    WEBHOOK_PATH = "/webhook"
+    
+    logger.info(f"🚀 Starting bot in WEBHOOK mode on Render.com...")
+    logger.info(f"📡 Webhook URL: {WEBHOOK_URL}{WEBHOOK_PATH}")
+
     application.run_webhook(
         listen="0.0.0.0",
-        port=10000,  # Render.com default port
+        port=10000,
         url_path=WEBHOOK_PATH,
         webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
         allowed_updates=["message", "callback_query"],
