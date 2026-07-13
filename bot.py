@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import datetime
 from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (
@@ -62,6 +63,9 @@ HOME_MENU_BANNER_URL = os.environ.get("HOME_MENU_BANNER_URL")
 OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "")
 LOG_CHANNEL_ID = os.environ.get("LOG_CHANNEL_ID")
 
+# Flag to track deployment log (only once)
+DEPLOYMENT_LOGGED = False
+
 # Fallback: collect images from ./ui/ and pick randomly when showing banner
 FALLBACK_BANNER = None
 UI_BANNERS = []
@@ -112,6 +116,35 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, log_message: str) -> bool
         logger.error(f"❌ Error sending log to channel: {e}")
         return False
 
+async def send_deployment_log(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    """Send deployment log (only once per bot session)"""
+    global DEPLOYMENT_LOGGED
+    
+    if DEPLOYMENT_LOGGED:
+        return True
+    
+    if not LOG_CHANNEL_ID:
+        logger.warning("LOG_CHANNEL_ID not configured, deployment log not sent")
+        return False
+    
+    try:
+        deploy_text = (
+            "🚀 <b>Bot Deployed Successfully!</b>\n\n"
+            "✅ Bot is now online and running.\n"
+            f"📅 Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            "👥 Ready to accept new users!"
+        )
+        await context.bot.send_message(
+            chat_id=LOG_CHANNEL_ID,
+            text=deploy_text,
+            parse_mode="HTML"
+        )
+        DEPLOYMENT_LOGGED = True
+        logger.info(f"✅ Deployment log sent to channel {LOG_CHANNEL_ID}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error sending deployment log: {e}")
+        return False
 
 """--------------------HELPER FUNCTIONS--------------------"""
 async def send_or_edit(update: Update, text, reply_markup=None, force_banner=None):
@@ -680,14 +713,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Handle back button - return to home menu
         if key == "back":
             text = (
-                "👋 ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ɪɴsᴛᴀɴᴛ ᴄᴏᴠᴇʀ ʙᴏᴛ\n\n"
-                "<b>Quick Start Guide:</b>\n\n"
-                "📸 <b>Step 1:</b> Send a photo as thumbnail\n"
-                "🎥 <b>Step 2:</b> Send a video to apply cover\n\n"
-                "<b>Navigation:</b>\n"
-                "❓ /help – Usage guide\n"
-                "⚙️ /settings – Manage thumbnails\n"
-                "ℹ️ /about – Bot information"
+                "Welcome to Cover Changer Bot ✅\n\n"
+                "• Send/forward image or link → Save cover\n"
+                "• Send/forward video → Apply cover\n"
+                "• /view_cover → View your current cover\n\n"
+                "📊 The bot never offline unless maintenance or admin intervention."
             )
             kb_rows = [
                 [InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="menu_help"),
@@ -928,10 +958,10 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-    "• Send/forward Image → Save cover\n"
+    "Welcome to Cover Changer Bot ✅\n\n"
+    "• Send/forward image or link → Save cover\n"
     "• Send/forward video → Apply cover\n"
-    "• /showthumbnail → View cover\n\n"
+    "• /view_cover → View your current cover\n\n"
     "📊 The bot never offline unless maintenance or admin intervention."
 )
 
@@ -1018,10 +1048,21 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🚫 ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ\n\nʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ʜᴀs ʙᴇᴇɴ ʀᴇsᴛʀɪᴄᴛᴇᴅ. ᴄᴏɴᴛᴀᴄᴛ sᴜᴘᴘᴏʀᴛ.", parse_mode="HTML")
         return
     
-    # Log new user (if first time)
-    user_check = get_thumbnail(user_id)
-    if user_check is None:
-        # New user - log it
+    # ====== NEW USER LOG (Only first time) ======
+    # Check if user already has a thumbnail saved (indicates existing user)
+    existing_thumbnail = get_thumbnail(user_id)
+    if existing_thumbnail is None:
+        # This is a new user - log it
+        log_text = (
+            f"🆕 <b>New User Started Bot</b>\n\n"
+            f"👤 <b>Name:</b> {first_name}\n"
+            f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
+            f"👤 <b>Username:</b> @{username if username != 'Unknown' else 'N/A'}\n"
+            f"📅 <b>Date:</b> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        await send_log(context, log_text)
+        
+        # Also log using existing database function
         log_data = log_new_user(user_id, username, first_name)
         log_msg = format_log_message(user_id, username, log_data["action"], log_data.get("details", ""))
         await send_log(context, log_msg)
@@ -1032,10 +1073,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     text = (
-    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-    "• Send/forward Image → Save cover\n"
+    "Welcome to Cover Changer Bot ✅\n\n"
+    "• Send/forward image or link → Save cover\n"
     "• Send/forward video → Apply cover\n"
-    "• /showthumbnail → View cover\n\n"
+    "• /view_cover → View your current cover\n\n"
     "📊 The bot never offline unless maintenance or admin intervention."
 )
 
@@ -1718,6 +1759,19 @@ def main() -> None:
 
     logger.info("✅ All handlers registered")
     logger.info("Bot starting (polling)")
+    
+    # Send deployment log when bot starts
+    try:
+        # Create a dummy context with bot
+        class DummyContext:
+            bot = app.bot
+        
+        dummy_context = DummyContext()
+        # Send deployment log
+        asyncio.create_task(send_deployment_log(dummy_context))
+    except Exception as e:
+        logger.error(f"Failed to send deployment log: {e}")
+    
     app.run_polling(
         allowed_updates=[
             "message",
