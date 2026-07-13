@@ -961,41 +961,53 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     first_name = update.effective_user.first_name or "User"
     
-    # ✅ LOG: User Start
-    try:
-        await log_user_start(
-            context.bot,
-            LOG_CHANNEL_ID,
-            user_id,
-            username,
-            first_name
-        )
-        logger.info(f"✅ Start log sent for user {user_id}")
-    except Exception as e:
-        logger.error(f"❌ Start log failed: {e}")
+    # ✅ CHECK: KYA USER PEHLE SE EXISTS KARTA HAI?
+    # Agar user ka thumbnail hai toh existing user hai
+    user_check = get_thumbnail(user_id)
+    is_new_user = user_check is None  # Agar None hai toh naya user hai
     
+    if is_new_user:
+        # ✅ SIRF NAYE USER KA LOG BHEJEIN
+        try:
+            await log_user_start(
+                context.bot,
+                LOG_CHANNEL_ID,
+                user_id,
+                username,
+                first_name
+            )
+            logger.info(f"✅ New user log sent for {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Start log failed for new user: {e}")
+        
+        # Database mein log karein
+        log_data = log_new_user(user_id, username, first_name)
+        log_msg = format_log_message(user_id, username, log_data["action"], log_data.get("details", ""))
+        await send_log(context, log_msg)
+    else:
+        # ✅ EXISTING USER - KOI LOG NAHI BHEJNA
+        logger.info(f"👋 Returning user: {user_id} (no log sent)")
+    
+    # Check if user is banned
     if is_user_banned(user_id):
         await update.message.reply_text("🚫 ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ\n\nʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ʜᴀs ʙᴇᴇɴ ʀᴇsᴛʀɪᴄᴛᴇᴅ. ᴄᴏɴᴛᴀᴄᴛ sᴜᴘᴘᴏʀᴛ.", parse_mode="HTML")
         return
     
-    user_check = get_thumbnail(user_id)
-    if user_check is None:
-        log_data = log_new_user(user_id, username, first_name)
-        log_msg = format_log_message(user_id, username, log_data["action"], log_data.get("details", ""))
-        await send_log(context, log_msg)
-    
+    # Check force-sub first
     if not await check_force_sub(update, context):
         logger.warning(f"❌ User {user_id} blocked by force-sub check")
         return
     
+    # Welcome message
     text = (
-    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-    "• Send/forward Image → Save cover\n"
-    "• Send/forward video → Apply cover\n"
-    "• /showthumbnail → View cover\n\n"
-    "📊 The bot never offline unless maintenance or admin intervention."
-)
-
+        "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+        "• Send/forward Image → Save cover\n"
+        "• Send/forward video → Apply cover\n"
+        "• /showthumbnail → View cover\n\n"
+        "📊 The bot never offline unless maintenance or admin intervention."
+    )
+    
+    # Build keyboard
     kb_rows = [
         [InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="menu_help"),
          InlineKeyboardButton("ℹ️ ᴀʙᴏᴜᴛ", callback_data="menu_about")],
@@ -1009,6 +1021,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     kb = InlineKeyboardMarkup(kb_rows)
     banner = HOME_MENU_BANNER_URL
     
+    # Send welcome message with banner
     if update.callback_query:
         msg = update.callback_query.message
         if banner:
