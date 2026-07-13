@@ -1052,9 +1052,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ ʜɪɢʜ-ǫᴜᴀʟɪᴛʏ ᴄᴏᴠᴇʀs\n"
         "✅ ᴀᴜᴛᴏᴍᴀᴛɪᴄ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ\n\n"
         "ᴄᴏᴍᴍᴀɴᴅs:\n"
-        "/help – ᴄᴏᴍᴘʟᴇᴛᴇ ɢᴜɪᴅᴇ\n"
-        "/settings – ᴍᴀɴᴀɢᴇ ᴄᴏɴᴛᴇɴᴛ\n"
-        "/about – ᴍᴏʀᴇ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ"
+        "/showthumbnail – Show Thumbnail"
     )
 
     # Build home menu with all buttons
