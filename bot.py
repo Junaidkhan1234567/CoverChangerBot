@@ -929,9 +929,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
     "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-    "• Send/forward Cover Photo → Save cover\n"
+    "• Send/forward Image → Save cover\n"
     "• Send/forward video → Apply cover\n"
-    "• /showthumbnail → View your current cover\n\n"
+    "• /showthumbnail → View cover\n\n"
     "📊 The bot never offline unless maintenance or admin intervention."
 )
 
@@ -1033,9 +1033,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     text = (
     "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-    "• Send/forward Cover Photo → Save cover\n"
+    "• Send/forward Image → Save cover\n"
     "• Send/forward video → Apply cover\n"
-    "• /showthumbnail → View your current cover\n\n"
+    "• /showthumbnail → View cover\n\n"
     "📊 The bot never offline unless maintenance or admin intervention."
 )
 
