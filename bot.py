@@ -32,31 +32,12 @@ app = Flask(__name__)
 def health_check():
     return "Bot is running!", 200
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Handle incoming Telegram updates via webhook"""
-    from telegram import Update
-    import json
-    
-    try:
-        # Get the update from Telegram
-        update_data = json.loads(request.get_data().decode('utf-8'))
-        update = Update.de_json(update_data, bot_app.bot)
-        
-        # Process the update
-        asyncio.run(process_update(update))
-        
-        return "OK", 200
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return "Error", 500
-
 def run_flask():
-    app.run(host="0.0.0.0", port=1000)
+    app.run(host="0.0.0.0", port=8080)
 
-# Flask server in background thread
+# अपने मुख्य `main()` फंक्शन से पहले यह कोड डालें
+# यह एक अलग थ्रेड में Flask सर्वर शुरू करेगा
 threading.Thread(target=run_flask, daemon=True).start()
-
 def bold_entities(text: str):
     """Return entities list to make full caption bold"""
     if not text:
@@ -1635,17 +1616,24 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Ignore all text messages (don't respond)
 
 
-"""-----------MAIN FUNCTION-----------"""
-def main() -> None:
-    application = Application.builder().token(TOKEN).build()
+"""-----------CALLBAck Hnadlers--------"""
 
+
+def main() -> None:
+    app = Application.builder().token(TOKEN).build()
+
+    # Global error handler
     async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Log all errors"""
         logger.error(f"🔴 ERROR: {context.error}", exc_info=context.error)
-    application.add_error_handler(error_handler)
+
+    app.add_error_handler(error_handler)
     
-    # Commands setup - webhook handled by run_webhook
+    # Setup bot commands on startup
     async def setup_commands(app: Application) -> None:
+        """Setup bot commands menu"""
         from telegram import BotCommand
+        
         commands = [
             BotCommand("start", "🏠 Start bot"),
             BotCommand("help", "ℹ️ How to use bot"),
@@ -1659,32 +1647,51 @@ def main() -> None:
             BotCommand("status", "⏱️ Bot status"),
             BotCommand("broadcast", "📢 Broadcast message"),
         ]
+        
         try:
             await app.bot.set_my_commands(commands)
             logger.info("✅ Bot commands configured successfully")
         except Exception as e:
             logger.error(f"❌ Error setting bot commands: {e}")
     
-    application.post_init = setup_commands
+    # Register post_init callback to setup commands
+    app.post_init = setup_commands
 
-    # ... (सारे handlers - start, help, about, settings, remove, restart, admin, ban, unban, stats, status, broadcast, photo, video, text, callback) ...
+    # Command handlers (MUST be registered FIRST before text handler)
+    app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("about", about, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("settings", settings, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("remove", remover, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("restart", restart, filters=filters.ChatType.PRIVATE))
+    
+    # Admin commands
+    app.add_handler(CommandHandler("admin", admin_menu, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("ban", ban_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("unban", unban_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("stats", stats_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("status", status_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("broadcast", broadcast_cmd, filters=filters.ChatType.PRIVATE))
+
+    # Photo and video handlers (private chats only via filters)
+    app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, photo_handler))
+    app.add_handler(MessageHandler(filters.VIDEO & filters.ChatType.PRIVATE, video_handler))
+    
+    # Text handler for dump channel ID capture (MUST be LAST - only non-command text)
+    # Add filter to exclude commands (messages starting with /)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, text_handler))
+    
+    # Register callback handler (handles all callbacks)
+    app.add_handler(CallbackQueryHandler(callback_handler))
 
     logger.info("✅ All handlers registered")
-
-    WEBHOOK_URL = "https://coverchangerbot.onrender.com"
-    WEBHOOK_PATH = "/webhook"
-    
-    logger.info(f"🚀 Starting bot in WEBHOOK mode on Render.com...")
-    logger.info(f"📡 Webhook URL: {WEBHOOK_URL}{WEBHOOK_PATH}")
-
-    # ⭐ run_webhook handles webhook setup automatically
-    application.run_webhook(
-        listen="0.0.0.0",
-        port=10000,
-        url_path=WEBHOOK_PATH,
-        webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
-        allowed_updates=["message", "callback_query"],
-        drop_pending_updates=True,
+    logger.info("Bot starting (polling)")
+    app.run_polling(
+        allowed_updates=[
+            "message",
+            "callback_query",
+        ],
+        close_loop=False,
     )
 
 
