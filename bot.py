@@ -1,6 +1,7 @@
 import os
 import logging
 import asyncio
+import re
 from datetime import datetime
 from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.constants import ChatMemberStatus
@@ -1268,7 +1269,11 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cover = get_thumbnail(user_id)
     
     if not cover:
-        return await update.message.reply_text("❌ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏᴜɴᴅ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴛʜᴜᴍʙɴᴀɪʟ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+        return await update.message.reply_text(
+            "❌ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏᴜɴᴅ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴛʜᴜᴍʙɴᴀɪʟ", 
+            reply_to_message_id=update.message.message_id, 
+            parse_mode="HTML"
+        )
     
     try:
         await log_video_processed(
@@ -1281,18 +1286,34 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.error(f"❌ Video log failed: {e}")
     
-    msg = await update.message.reply_text("⏳ ᴘʀᴏᴄᴇssɪɴɢ ᴠɪᴅᴇᴏ\n\nᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ sᴇᴄᴏɴᴅs", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    msg = await update.message.reply_text(
+        "⏳ ᴘʀᴏᴄᴇssɪɴɢ ᴠɪᴅᴇᴏ\n\nᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ sᴇᴄᴏɴᴅs", 
+        reply_to_message_id=update.message.message_id, 
+        parse_mode="HTML"
+    )
     
     video = update.message.video.file_id
-    
     original_caption = update.message.caption or ""
-    new_caption = original_caption
-    caption_entities = bold_entities(original_caption)
     
-    media = InputMediaVideo(media=video, caption=new_caption,caption_entities=caption_entities, supports_streaming=True, cover=cover)
+    # ✅ URL REMOVE
+    url_pattern = r'https?://[^\s]+|t\.me/[^\s]+|telegram\.me/[^\s]+'
+    clean_caption = re.sub(url_pattern, '', original_caption).strip()
+    clean_caption = ' '.join(clean_caption.split())  # Extra spaces remove
+    
+    # ✅ Sirf clean caption
+    media = InputMediaVideo(
+        media=video, 
+        caption=clean_caption,
+        supports_streaming=True, 
+        cover=cover
+    )
     
     try:
-        await context.bot.edit_message_media(chat_id=update.effective_chat.id, message_id=msg.message_id, media=media)
+        await context.bot.edit_message_media(
+            chat_id=update.effective_chat.id, 
+            message_id=msg.message_id, 
+            media=media
+        )
         
         if LOG_CHANNEL_ID:
             try:
@@ -1300,7 +1321,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"🎥 <b>ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssɪɴɢ ᴄᴏᴍᴘʟᴇᴛᴇᴅ</b>\n\n"
                     f"👤 ᴜsᴇʀ ɪᴅ: <code>{user_id}</code>\n"
                     f"📌 ᴜsᴇʀɴᴀᴍᴇ: @{username}\n"
-                    f"📝 ᴄᴀᴘᴛɪᴏɴ: {original_caption or 'ɴᴏ ᴄᴀᴘᴛɪᴏɴ'}\n"
+                    f"📝 ᴄᴀᴘᴛɪᴏɴ: {clean_caption or 'ɴᴏ ᴄᴀᴘᴛɪᴏɴ'}\n"
                     f"⏰ ᴛɪᴍᴇsᴛᴀᴍᴘ: {update.message.date}"
                 )
                 await context.bot.send_video(
@@ -1311,11 +1332,15 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     thumbnail=cover,
                     parse_mode="HTML"
                 )
-                logger.debug(f"✅ Video logged to channel for user {user_id}")
             except Exception as e:
-                logger.error(f"❌ Error forwarding video to log channel: {e}")
+                logger.error(f"❌ Error forwarding video: {e}")
+                
     except Exception as e:
-        await update.message.reply_text("❌ ᴘʀᴏᴄᴇssɪɴɢ ꜰᴀɪʟᴇᴅ\n\nᴇʀʀᴏʀ: " + str(e)[:50], parse_mode="HTML")
+        logger.error(f"❌ Video error: {e}")
+        await update.message.reply_text(
+            f"❌ ᴘʀᴏᴄᴇssɪɴɢ ꜰᴀɪʟᴇᴅ\n\nᴇʀʀᴏʀ: {str(e)[:100]}", 
+            parse_mode="HTML"
+        )
 
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
