@@ -685,9 +685,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "📸 <b>Step 1:</b> Send a photo as thumbnail\n"
                 "🎥 <b>Step 2:</b> Send a video to apply cover\n\n"
                 "<b>Navigation:</b>\n"
-                "❓ /help – Usage guide\n"
-                "⚙️ /settings – Manage thumbnails\n"
-                "ℹ️ /about – Bot information"
+                "❓ /showthumbnail – Show Thumbnail\n"
             )
             kb_rows = [
                 [InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="menu_help"),
