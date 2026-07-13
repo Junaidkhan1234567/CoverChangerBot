@@ -35,9 +35,8 @@ def health_check():
 def run_flask():
     app.run(host="0.0.0.0", port=8080)
 
-# अपने मुख्य `main()` फंक्शन से पहले यह कोड डालें
-# यह एक अलग थ्रेड में Flask सर्वर शुरू करेगा
 threading.Thread(target=run_flask, daemon=True).start()
+
 def bold_entities(text: str):
     """Return entities list to make full caption bold"""
     if not text:
@@ -720,6 +719,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "   • ᴛʜᴜᴍʙɴᴀɪʟ ᴀᴘᴘʟɪᴇᴅ ɪɴsᴛᴀɴᴛʟʏ\n\n"
                     "<b>ᴀᴅᴅɪᴛɪᴏɴᴀʟ ᴄᴏᴍᴍᴀɴᴅs:</b>\n"
                     "/remove – ᴅᴇʟᴇᴛᴇ sᴀᴠᴇᴅ ᴛʜᴜᴍʙɴᴀɪʟ\n"
+                    "/showthumbnail – ᴠɪᴇᴡ sᴀᴠᴇᴅ ᴛʜᴜᴍʙɴᴀɪʟ\n"
                     "/settings – ᴠɪᴇᴡ & ᴍᴀɴᴀɢᴇ sᴇᴛᴛɪɴɢs\n"
                     "/about – ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ᴀʙᴏᴜᴛ ʙᴏᴛ"
                 )
@@ -1106,6 +1106,52 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
         await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+
+
+async def show_thumbnail_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show user's saved thumbnail"""
+    if not await check_force_sub(update, context):
+        return
+    
+    user_id = update.message.from_user.id
+    photo_id = get_thumbnail(user_id)
+    
+    if photo_id:
+        text = (
+            "🖼️ <b>ʏᴏᴜʀ sᴀᴠᴇᴅ ᴛʜᴜᴍʙɴᴀɪʟ</b>\n\n"
+            "ᴛʜɪs ᴘʜᴏᴛᴏ ᴡɪʟʟ ʙᴇ ᴀᴘᴘʟɪᴇᴅ ᴛᴏ ʏᴏᴜʀ ᴠɪᴅᴇᴏs\n"
+            "ᴄʜᴀɴɢᴇ ɪᴛ ᴀɴʏᴛɪᴍᴇ ʙʏ ᴜᴘʟᴏᴀᴅɪɴɢ ᴀ ɴᴇᴡ ᴏɴᴇ"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🗑️ ᴅᴇʟᴇᴛᴇ ᴛʜᴜᴍʙɴᴀɪʟ", callback_data="thumb_delete")],
+            [InlineKeyboardButton("⬅️ ʙᴀᴄᴋ", callback_data="menu_back")]
+        ])
+        try:
+            await update.message.reply_photo(
+                photo=photo_id,
+                caption=text,
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.error(f"Error sending thumbnail: {e}")
+            await update.message.reply_text(
+                "❌ ꜰᴀɪʟᴇᴅ ᴛᴏ ᴅɪsᴘʟᴀʏ ᴛʜᴜᴍʙɴᴀɪʟ\n\n"
+                "ᴛʜᴇ ᴘʜᴏᴛᴏ ᴍᴀʏ ʜᴀᴠᴇ ʙᴇᴇɴ ᴅᴇʟᴇᴛᴇᴅ ꜰʀᴏᴍ ᴛᴇʟᴇɢʀᴀᴍ's sᴇʀᴠᴇʀs.\n"
+                "ᴘʟᴇᴀsᴇ ᴜᴘʟᴏᴀᴅ ᴀ ɴᴇᴡ ᴏɴᴇ.",
+                parse_mode="HTML"
+            )
+    else:
+        text = (
+            "❌ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ sᴀᴠᴇᴅ ʏᴇᴛ\n\n"
+            "📸 sᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ᴛᴏ sᴀᴠᴇ ʏᴏᴜʀ ᴛʜᴜᴍʙɴᴀɪʟ"
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ ʙᴀᴄᴋ", callback_data="menu_back")]
+        ])
+        await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+
+
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1138,6 +1184,8 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
     await update.message.reply_text(text, parse_mode="HTML")
+
+
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1170,6 +1218,8 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception:
             pass
     await update.message.reply_text(text, parse_mode="HTML")
+
+
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1203,7 +1253,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
 
 
-
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1218,6 +1267,7 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         return await update.message.reply_text("✅ ᴛʜᴜᴍʙɴᴀɪʟ ʀᴇᴍᴏᴠᴇᴅ\n\nᴅᴇʟᴇᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ. ᴜᴘʟᴏᴀᴅ ᴀ ɴᴇᴡ ᴏɴᴇ ᴀɴʏᴛɪᴍᴇ!", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     await update.message.reply_text("⚠️ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ᴛᴏ ʀᴇᴍᴏᴠᴇ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ!", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+
 
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
@@ -1240,6 +1290,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     action_text = "ᴜᴘᴅᴀᴛᴇᴅ" if is_replace else "sᴀᴠᴇᴅ"
     await update.message.reply_text("✅ ᴛʜᴜᴍʙɴᴀɪʟ " + action_text + "\n\nʀᴇᴀᴅʏ! sᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ ᴛᴏ ᴀᴘᴘʟʏ ᴄᴏᴠᴇʀ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+
 
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
@@ -1495,18 +1546,18 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = (
             "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\n\n"
-            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\\n"
-            f"⏰ ᴜᴘᴛɪᴍᴇ: {uptime_hours}ʜ {uptime_mins}ᴍ\\n\\n"
-            f"🖥 sʏsᴛᴇᴍ ʀᴇsᴏᴜʀᴄᴇs:\\n"
-            f"🔴 ᴄᴘᴜ: {cpu_percent}%\\n"
+            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n"
+            f"⏰ ᴜᴘᴛɪᴍᴇ: {uptime_hours}ʜ {uptime_mins}ᴍ\n\n"
+            f"🖥 sʏsᴛᴇᴍ ʀᴇsᴏᴜʀᴄᴇs:\n"
+            f"🔴 ᴄᴘᴜ: {cpu_percent}%\n"
             f"🟡 ʀᴀᴍ: {ram_percent}% ({ram.used // (1024**2)} ᴍʙ / {ram.total // (1024**2)} ᴍʙ)"
         )
         await update.message.reply_text(text, parse_mode="HTML")
     except ImportError:
         text = (
-            "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\\n\\n"
-            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\\n\\n"
-            "⚠️ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ ꜰᴏʀ sʏsᴛᴇᴍ sᴛᴀᴛs\\n"
+            "⏱️ ʙᴏᴛ sᴛᴀᴛᴜs\n\n"
+            f"🟢 sᴛᴀᴛᴜs: ᴏɴʟɪɴᴇ\n\n"
+            "⚠️ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ ꜰᴏʀ sʏsᴛᴇᴍ sᴛᴀᴛs\n"
             "📦 ʀᴜɴ: ᴘɪᴘ ɪɴsᴛᴀʟʟ ᴘsᴜᴛɪʟ"
         )
         await update.message.reply_text(text, parse_mode="HTML")
@@ -1523,10 +1574,10 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if len(args) < 2:
         return await update.message.reply_text(
             "❌ ᴜsᴀɢᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ <ᴍᴇssᴀɢᴇ>\n\n"
-            "📌 ᴇxᴀᴍᴘʟᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ ʜᴇʟʟᴏ ᴇᴠᴇʀʏᴏɴᴇ!\\n\\n"
-            "💡 ᴛɪᴘs:\\n"
-            "• ᴍᴇssᴀɢᴇ sᴇɴᴛ ᴛᴏ ᴀʟʟ ᴜsᴇʀs\\n"
-            "• ʜᴛᴍʟ ꜰᴏʀᴍᴀᴛᴛɪɴɢ sᴜᴘᴘᴏʀᴛᴇᴅ\\n"
+            "📌 ᴇxᴀᴍᴘʟᴇ: /ʙʀᴏᴀᴅᴄᴀsᴛ ʜᴇʟʟᴏ ᴇᴠᴇʀʏᴏɴᴇ!\n\n"
+            "💡 ᴛɪᴘs:\n"
+            "• ᴍᴇssᴀɢᴇ sᴇɴᴛ ᴛᴏ ᴀʟʟ ᴜsᴇʀs\n"
+            "• ʜᴛᴍʟ ꜰᴏʀᴍᴀᴛᴛɪɴɢ sᴜᴘᴘᴏʀᴛᴇᴅ\n"
             "• ᴇᴍᴏᴊɪs ᴡᴏʀᴋ ɢʀᴇᴀᴛ ᴛᴏᴏ",
             parse_mode="HTML"
         )
@@ -1536,7 +1587,7 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Show confirmation
     confirm_text = (
         "📢 ʙʀᴏᴀᴅᴄᴀsᴛ ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ\n\n"
-        f"📝 ᴍᴇssᴀɢᴇ:\\n"
+        f"📝 ᴍᴇssᴀɢᴇ:\n"
         f"{message_text}\n\n"
         f"👥 ᴛᴏᴛᴀʟ ᴜsᴇʀs: {get_total_users()}\n\n"
         "⚠️ ᴘʀᴏᴄᴇssɪɴɢ... sᴇɴᴅɪɴɢ ɴᴏᴡ"
@@ -1599,13 +1650,12 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
     except Exception as e:
         await msg.edit_text(
-            f"❌ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴀɪʟᴇᴅ\\n\\n"
-            f"ᴇʀʀᴏʀ: {str(e)[:100]}\\n\\n"
+            f"❌ ʙʀᴏᴀᴅᴄᴀsᴛ ꜰᴀɪʟᴇᴅ\n\n"
+            f"ᴇʀʀᴏʀ: {str(e)[:100]}\n\n"
             "ᴄʜᴇᴄᴋ ʟᴏɢs ꜰᴏʀ ᴅᴇᴛᴀɪʟs.",
             parse_mode="HTML"
         )
         logger.error(f"Broadcast error: {e}", exc_info=True)
-
 
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1640,6 +1690,7 @@ def main() -> None:
             BotCommand("about", "🤖 About bot"),
             BotCommand("settings", "⚙️ Bot settings"),
             BotCommand("remove", "🗑️ Remove thumbnail"),
+            BotCommand("showthumbnail", "🖼️ Show thumbnail"),
             BotCommand("admin", "🛡️ Admin panel"),
             BotCommand("ban", "🚫 Ban user"),
             BotCommand("unban", "✅ Unban user"),
@@ -1663,6 +1714,7 @@ def main() -> None:
     app.add_handler(CommandHandler("about", about, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("settings", settings, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("remove", remover, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("showthumbnail", show_thumbnail_cmd, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("restart", restart, filters=filters.ChatType.PRIVATE))
     
     # Admin commands
