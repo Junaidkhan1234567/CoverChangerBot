@@ -1643,6 +1643,7 @@ def main() -> None:
         logger.error(f"🔴 ERROR: {context.error}", exc_info=context.error)
     application.add_error_handler(error_handler)
     
+    # Commands setup - webhook handled by run_webhook
     async def setup_commands(app: Application) -> None:
         from telegram import BotCommand
         commands = [
@@ -1664,27 +1665,9 @@ def main() -> None:
         except Exception as e:
             logger.error(f"❌ Error setting bot commands: {e}")
     
-    async def setup_webhook(app: Application) -> None:
-        WEBHOOK_URL = "https://coverchangerbot.onrender.com"
-        WEBHOOK_PATH = "/webhook"
-        try:
-            await app.bot.delete_webhook(drop_pending_updates=True)
-            logger.info("✅ Old webhook deleted")
-            await app.bot.set_webhook(
-                url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
-                allowed_updates=["message", "callback_query"],
-            )
-            logger.info(f"✅ Webhook set to: {WEBHOOK_URL}{WEBHOOK_PATH}")
-        except Exception as e:
-            logger.error(f"❌ Webhook setup error: {e}")
-    
-    async def post_init(app: Application) -> None:
-        await setup_commands(app)
-        await setup_webhook(app)
-    
-    application.post_init = post_init
+    application.post_init = setup_commands
 
-    # ... सारे handlers (start, help, about, settings, remove, restart, admin, ban, unban, stats, status, broadcast, photo, video, text, callback) ...
+    # ... (सारे handlers - start, help, about, settings, remove, restart, admin, ban, unban, stats, status, broadcast, photo, video, text, callback) ...
 
     logger.info("✅ All handlers registered")
 
@@ -1694,12 +1677,14 @@ def main() -> None:
     logger.info(f"🚀 Starting bot in WEBHOOK mode on Render.com...")
     logger.info(f"📡 Webhook URL: {WEBHOOK_URL}{WEBHOOK_PATH}")
 
+    # ⭐ run_webhook handles webhook setup automatically
     application.run_webhook(
         listen="0.0.0.0",
         port=10000,
         url_path=WEBHOOK_PATH,
         webhook_url=f"{WEBHOOK_URL}{WEBHOOK_PATH}",
         allowed_updates=["message", "callback_query"],
+        drop_pending_updates=True,
     )
 
 
