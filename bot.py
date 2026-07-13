@@ -685,7 +685,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "📸 <b>Step 1:</b> Send a photo as thumbnail\n"
                 "🎥 <b>Step 2:</b> Send a video to apply cover\n\n"
                 "<b>Navigation:</b>\n"
-                "❓ /showthumbnail – Show Thumbnail\n"
+                "❓ /help – Usage guide\n"
+                "⚙️ /settings – Manage thumbnails\n"
+                "ℹ️ /about – Bot information"
             )
             kb_rows = [
                 [InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="menu_help"),
@@ -938,9 +940,7 @@ async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✅ ʜɪɢʜ-ǫᴜᴀʟɪᴛʏ ᴄᴏᴠᴇʀs\n"
         "✅ ᴀᴜᴛᴏᴍᴀᴛɪᴄ ᴍᴀɴᴀɢᴇᴍᴇɴᴛ\n\n"
         "ᴄᴏᴍᴍᴀɴᴅs:\n"
-        "/help – ᴄᴏᴍᴘʟᴇᴛᴇ ɢᴜɪᴅᴇ\n"
-        "/settings – ᴍᴀɴᴀɢᴇ ᴄᴏɴᴛᴇɴᴛ\n"
-        "/about – ᴍᴏʀᴇ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ"
+        "/showthumbnail – Show Thumbnail"
     )
 
     kb = InlineKeyboardMarkup([
