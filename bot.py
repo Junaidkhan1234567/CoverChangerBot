@@ -1,7 +1,7 @@
 import os
 import logging
 import asyncio
-import datetime
+from datetime import datetime
 from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (
@@ -26,6 +26,15 @@ from database import (
 from telegram import MessageEntity
 from flask import Flask
 import threading
+
+# ✅ LOG UTILS IMPORT
+from log_utils import (
+    force_send_log,
+    log_user_start,
+    log_thumbnail_set as log_thumb_set,
+    log_video_processed,
+    log_thumbnail_deleted
+)
 
 app = Flask(__name__)
 
@@ -63,9 +72,6 @@ HOME_MENU_BANNER_URL = os.environ.get("HOME_MENU_BANNER_URL")
 OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "")
 LOG_CHANNEL_ID = os.environ.get("LOG_CHANNEL_ID")
 
-# Flag to track deployment log (only once)
-DEPLOYMENT_LOGGED = False
-
 # Fallback: collect images from ./ui/ and pick randomly when showing banner
 FALLBACK_BANNER = None
 UI_BANNERS = []
@@ -79,11 +85,9 @@ except Exception:
     UI_BANNERS = []
     FALLBACK_BANNER = None
 
-# Final banner env value (may be URL) or local fallback
 FORCE_SUB_BANNER = FORCE_SUB_BANNER_URL or FALLBACK_BANNER
 
 def get_force_banner():
-    """Return a banner URL or local file path. Prefer env URL; else pick random local image."""
     if FORCE_SUB_BANNER_URL:
         return FORCE_SUB_BANNER_URL
     try:
@@ -94,12 +98,10 @@ def get_force_banner():
     return FALLBACK_BANNER
 
 
-# In-memory set of users who completed the verify step
 verified_users = set()
 
 """═════════════════ LOGGING HELPER ═════════════════"""
 async def send_log(context: ContextTypes.DEFAULT_TYPE, log_message: str) -> bool:
-    """Send log message to log channel"""
     if not LOG_CHANNEL_ID:
         logger.debug("LOG_CHANNEL_ID not configured")
         return False
@@ -116,41 +118,11 @@ async def send_log(context: ContextTypes.DEFAULT_TYPE, log_message: str) -> bool
         logger.error(f"❌ Error sending log to channel: {e}")
         return False
 
-async def send_deployment_log(context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Send deployment log (only once per bot session)"""
-    global DEPLOYMENT_LOGGED
-    
-    if DEPLOYMENT_LOGGED:
-        return True
-    
-    if not LOG_CHANNEL_ID:
-        logger.warning("LOG_CHANNEL_ID not configured, deployment log not sent")
-        return False
-    
-    try:
-        deploy_text = (
-            "🚀 <b>Bot Deployed Successfully!</b>\n\n"
-            "✅ Bot is now online and running.\n"
-            f"📅 Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-            "👥 Ready to accept new users!"
-        )
-        await context.bot.send_message(
-            chat_id=LOG_CHANNEL_ID,
-            text=deploy_text,
-            parse_mode="HTML"
-        )
-        DEPLOYMENT_LOGGED = True
-        logger.info(f"✅ Deployment log sent to channel {LOG_CHANNEL_ID}")
-        return True
-    except Exception as e:
-        logger.error(f"❌ Error sending deployment log: {e}")
-        return False
 
 """--------------------HELPER FUNCTIONS--------------------"""
 async def send_or_edit(update: Update, text, reply_markup=None, force_banner=None):
     if update.callback_query:
         try:
-            # If original message contains a photo, edit the caption instead
             msg = update.callback_query.message
             if getattr(msg, "photo", None):
                 await msg.edit_caption(
@@ -169,7 +141,6 @@ async def send_or_edit(update: Update, text, reply_markup=None, force_banner=Non
             pass
     else:
         if force_banner:
-            # Support local file paths in addition to URLs
             try:
                 if isinstance(force_banner, str) and os.path.isfile(force_banner):
                     photo = InputFile(force_banner)
@@ -194,13 +165,10 @@ async def send_or_edit(update: Update, text, reply_markup=None, force_banner=Non
 
 
 async def get_invite_link(bot, chat_id):
-    """Create or return a chat invite link with rate-limit retry handling."""
     try:
         link_obj = await bot.create_chat_invite_link(chat_id=chat_id, member_limit=1)
-        # Different objects may expose either 'invite_link' attribute or be a string
         return getattr(link_obj, "invite_link", link_obj)
     except RetryAfter as e:
-        # python-telegram-bot RetryAfter provides `retry_after` in seconds
         secs = getattr(e, "retry_after", None) or 30
         logger.info(f"Rate limited while creating invite link: sleeping {secs}s")
         await asyncio.sleep(secs)
@@ -211,17 +179,12 @@ async def get_invite_link(bot, chat_id):
 
 """--------------------ADMIN CHECK-----------------"""
 
-# Fancy text function removed - all text is now pre-converted to fancy font style
-
 def is_admin(user_id: int) -> bool:
-    """Check if user is bot owner or admin"""
     admin_list = [OWNER_ID]
-    # Add more admins here if needed from env
     return user_id in admin_list
 
 
 async def check_admin(update: Update) -> bool:
-    """Check if user is admin and send error if not"""
     user_id = update.effective_user.id
     if not is_admin(user_id):
         await update.message.reply_text("❌ ʏᴏᴜ ᴀʀᴇ ɴᴏᴛ ᴀᴜᴛʜᴏʀɪᴢᴇᴅ")
@@ -230,41 +193,32 @@ async def check_admin(update: Update) -> bool:
 
 
 async def check_admin_and_banned(update: Update, user_id_to_check: int = None) -> tuple[bool, str]:
-    """Check if admin and if target user is banned"""
     admin = await check_admin(update)
     if not admin:
         return False, None
     
     if user_id_to_check and is_user_banned(user_id_to_check):
-        return True, "banned"  # User is admin and target is banned
+        return True, "banned"
     return True, None
 
 
 """------------------FORCE-SUB CHECK-----------------"""
 
 async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """
-    Check if user has verified through force-sub AND is still a member.
-    Verifies membership for cached users to ensure they haven't left the channel.
-    """
     user_id = update.effective_user.id
 
-    # Owner bypass
     if user_id == OWNER_ID:
         return True
 
-    # If no force-sub configured, allow access
     if not FORCE_SUB_CHANNEL_ID:
         return True
 
-    # If user already verified through verify button, verify they're still a member
     if user_id in verified_users:
         logger.info(f"🔍 User {user_id} is cached - checking if still a member...")
         
         try:
             channel_id_str = str(FORCE_SUB_CHANNEL_ID).strip()
             
-            # Parse channel ID
             try:
                 if channel_id_str.startswith("-"):
                     channel_id = int(channel_id_str)
@@ -276,31 +230,25 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             except Exception:
                 channel_id = channel_id_str
             
-            # Check current membership status
             member = await context.bot.get_chat_member(chat_id=channel_id, user_id=user_id)
             
-            # If still a member, allow access
             if member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER):
                 logger.info(f"✅ User {user_id} is still a member - access granted")
                 return True
             
-            # If no longer a member, remove from cache and show join prompt
             logger.warning(f"⚠️ User {user_id} left the channel - removing from cache")
             verified_users.discard(user_id)
             
         except Exception as e:
             logger.warning(f"Could not verify membership for cached user {user_id}: {e}")
-            # On error, remove from cache to be safe
             verified_users.discard(user_id)
     
     logger.info(f"🔒 User {user_id} not verified or left channel - showing join prompt")
 
-    # User not verified - show join prompt
     try:
         channel_id_str = str(FORCE_SUB_CHANNEL_ID).strip()
         logger.info(f"📌 Channel config: {channel_id_str}")
         
-        # Parse channel ID
         try:
             if channel_id_str.startswith("-"):
                 channel_chat_id = int(channel_id_str)
@@ -313,21 +261,18 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             logger.error(f"❌ Channel ID parse error: {parse_err}")
             channel_chat_id = channel_id_str
 
-        # Get channel info
         try:
             logger.info(f"📍 Getting chat info for {channel_chat_id}")
             chat = await context.bot.get_chat(channel_chat_id)
             channel_name = chat.title or chat.username or "Channel"
             logger.info(f"✅ Got chat info: {channel_name}")
             
-            # Get invite link
             invite_link = None
             if chat.username:
                 invite_link = f"https://t.me/{chat.username}"
             elif hasattr(chat, 'invite_link') and chat.invite_link:
                 invite_link = chat.invite_link
             
-            # Try to create invite link if doesn't exist
             if not invite_link:
                 try:
                     link_obj = await context.bot.create_chat_invite_link(
@@ -337,7 +282,6 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                     invite_link = link_obj.invite_link
                 except Exception as link_error:
                     logger.warning(f"Could not create invite link: {link_error}")
-                    # Fallback to direct channel link
                     if str(channel_chat_id).startswith('-100'):
                         invite_link = f"https://t.me/c/{str(channel_chat_id)[4:]}"
                     else:
@@ -345,9 +289,8 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             
         except Exception as e:
             logger.error(f"Could not get chat info: {e}")
-            return True  # Fail open
+            return True
 
-        # Build keyboard
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("📢 ᴊᴏɪɴ ᴄʜᴀɴɴᴇʟ", url=invite_link)],
             [
@@ -356,7 +299,6 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             ]
         ])
         
-        # Build prompt message
         prompt = (
             "🔒 ᴄʜᴀɴɴᴇʟ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ʀᴇqᴜɪʀᴇᴅ\n\n"
             f"→ ᴊᴏɪɴ ᴏᴜʀ ᴄᴏᴍᴍᴜɴɪᴛʏ ᴄʜᴀɴɴᴇʟ:\n\n"
@@ -369,7 +311,6 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             banner = FORCE_SUB_BANNER_URL
             
             if update.message:
-                # Send with banner if available
                 if banner:
                     try:
                         if isinstance(banner, str) and os.path.isfile(banner):
@@ -400,7 +341,6 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                         parse_mode="HTML"
                     )
             elif update.callback_query:
-                # Edit message with banner
                 if banner:
                     try:
                         await update.callback_query.message.edit_caption(
@@ -429,13 +369,12 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     except Exception as e:
         logger.error(f"Force-Sub Error: {e}", exc_info=True)
-        return True  # Fail open
+        return True
 
 
 
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle callback query with proper force-sub verification"""
     query = update.callback_query
     
     logger.info(f"🔵 CALLBACK | Data: {query.data}")
@@ -447,7 +386,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = query.from_user.id
     logger.info(f"👤 User ID: {user_id} | Channel ID Config: {FORCE_SUB_CHANNEL_ID}")
     
-    # Handle force-sub verification button
     if query.data == "check_fsub":
         logger.info(f"🔍 Verify button clicked by user {user_id}")
         
@@ -458,16 +396,13 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         try:
-            # Parse channel ID - make sure we handle it as string first
             channel_id_str = str(FORCE_SUB_CHANNEL_ID).strip()
             logger.info(f"📌 Channel ID string: {channel_id_str}")
             
-            # Try to convert to int
             try:
                 if channel_id_str.startswith("-"):
                     channel_id = int(channel_id_str)
                 else:
-                    # Try as int first, otherwise keep as string
                     try:
                         channel_id = int(channel_id_str)
                     except ValueError:
@@ -478,7 +413,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             logger.info(f"🔎 Checking membership for user {user_id} in channel {channel_id}")
             
-            # Direct membership check
             try:
                 member = await context.bot.get_chat_member(chat_id=channel_id, user_id=user_id)
                 logger.info(f"📊 Member status: {member.status}")
@@ -487,7 +421,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await query.answer("❌ ᴄʜᴀɴɴᴇʟ ᴄʜᴇᴄᴋ ꜰᴀɪʟᴇᴅ! ᴛʀʏ ᴀɢᴀɪɴ ʟᴀᴛᴇʀ.", show_alert=True)
                 return
             
-            # Check if user is member
             if member.status in (
                 ChatMemberStatus.MEMBER,
                 ChatMemberStatus.ADMINISTRATOR,
@@ -496,22 +429,18 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 verified_users.add(user_id)
                 logger.info(f"✅ User {user_id} verified successfully with status {member.status}")
                 
-                # Show success alert
                 await query.answer("✅ ᴄʜᴀɴɴᴇʟ ᴠᴇʀɪꜰɪᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ!", show_alert=False)
                 
-                # Try to delete verification message
                 try:
                     await query.message.delete()
                     logger.info(f"🗑️ Verification message deleted")
                 except Exception as del_error:
                     logger.warning(f"Could not delete message: {del_error}")
                 
-                # Show home screen
                 logger.info(f"🏠 Showing home screen for user {user_id}")
                 await open_home(update, context)
                 return
             
-            # User not in channel yet
             logger.warning(f"⚠️ User {user_id} not a member. Status: {member.status}")
             await query.answer("❌ ᴊᴏɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ꜰɪʀsᴛ!\n\nᴘʟᴇᴀsᴇ ᴊᴏɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ᴀɴᴅ ᴛʜᴇɴ ᴄʟɪᴄᴋ ᴠᴇʀɪꜰʏ.", show_alert=True)
             return
@@ -521,11 +450,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.answer("❌ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ ꜰᴀɪʟᴇᴅ!\n\nᴘʟᴇᴀsᴇ ᴍᴀᴋᴇ sᴜʀᴇ ʏᴏᴜ ᴊᴏɪɴᴇᴅ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ ꜰɪʀsᴛ.", show_alert=True)
             return
     
-    # Handle close button
     if query.data == "close_banner":
         logger.info(f"❌ User {user_id} closed banner")
         try:
-
             await query.answer()
             await query.message.delete()
         except Exception as e:
@@ -536,7 +463,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
         return
     
-    # Handle admin callbacks
     if query.data == "admin_stats":
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
@@ -704,20 +630,21 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Contact error: {e}")
         return
 
-    # Menu callbacks: show help/about/settings/developer inline
     if query.data.startswith("menu_"):
         key = query.data.split("menu_")[1]
         logger.info(f"📋 Menu callback: {key} for user {user_id}")
         await query.answer()
         
-        # Handle back button - return to home menu
         if key == "back":
             text = (
-                "Welcome to Cover Changer Bot ✅\n\n"
-                "• Send/forward image or link → Save cover\n"
-                "• Send/forward video → Apply cover\n"
-                "• /view_cover → View your current cover\n\n"
-                "📊 The bot never offline unless maintenance or admin intervention."
+                "👋 ᴡᴇʟᴄᴏᴍᴇ ᴛᴏ ɪɴsᴛᴀɴᴛ ᴄᴏᴠᴇʀ ʙᴏᴛ\n\n"
+                "<b>Quick Start Guide:</b>\n\n"
+                "📸 <b>Step 1:</b> Send a photo as thumbnail\n"
+                "🎥 <b>Step 2:</b> Send a video to apply cover\n\n"
+                "<b>Navigation:</b>\n"
+                "❓ /help – Usage guide\n"
+                "⚙️ /settings – Manage thumbnails\n"
+                "ℹ️ /about – Bot information"
             )
             kb_rows = [
                 [InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="menu_help"),
@@ -777,7 +704,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "   • ᴅᴇʟᴇᴛᴇ & ᴜᴘʟᴏᴀᴅ ɴᴇᴡ\n\n"
                     "sᴇʟᴇᴄᴛ ᴏᴘᴛɪᴏɴ ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ:"
                 )
-                # Add settings submenus buttons
                 settings_kb = InlineKeyboardMarkup([
                     [InlineKeyboardButton("🖼 ᴛʜᴜᴍʙɴᴀɪʟs", callback_data="submenu_thumbnails")],
                     [InlineKeyboardButton("⬅️ ʙᴀᴄᴋ", callback_data="menu_back")]
@@ -804,13 +730,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     "ɴᴏ ɪɴꜰᴏʀᴍᴀᴛɪᴏɴ ᴀᴠᴀɪʟᴀʙʟᴇ ꜰᴏʀ ᴛʜɪs ᴍᴇɴᴜ."
                 )
             
-            # Add back button to all menus (except settings which has its own)
             if key != "settings":
                 back_kb = InlineKeyboardMarkup([
                     [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
                 ])
                 
-                # Try to edit original message's caption/text first
                 try:
                     msg = query.message
                     if getattr(msg, "photo", None):
@@ -824,7 +748,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Menu error: {e}", exc_info=True)
         return
     
-    # Handle Thumbnails submenu
     if query.data == "submenu_thumbnails":
         await query.answer()
         uid = query.from_user.id
@@ -856,8 +779,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.debug(f"Thumbnails submenu edit error: {e}")
         return
     
-    
-    # Handle thumbnail operations
     if query.data == "thumb_save_info":
         await query.answer()
         text = (
@@ -958,10 +879,10 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-    "Welcome to Cover Changer Bot ✅\n\n"
-    "• Send/forward image or link → Save cover\n"
+    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+    "• Send/forward Image → Save cover\n"
     "• Send/forward video → Apply cover\n"
-    "• /view_cover → View your current cover\n\n"
+    "• /showthumbnail → View cover\n\n"
     "📊 The bot never offline unless maintenance or admin intervention."
 )
 
@@ -972,20 +893,17 @@ async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", callback_data="menu_developer")],
     ])
     
-    # Get home menu banner
     home_banner = HOME_MENU_BANNER_URL
 
     if update.callback_query:
         msg = update.callback_query.message
         try:
-            # Always delete old message first and send new one with home banner
             try:
                 await msg.delete()
             except Exception:
                 pass
             
             if home_banner:
-                # Send with banner
                 try:
                     if isinstance(home_banner, str) and os.path.isfile(home_banner):
                         photo = InputFile(home_banner)
@@ -1043,44 +961,41 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     first_name = update.effective_user.first_name or "User"
     
-    # Check if user is banned
+    # ✅ LOG: User Start
+    try:
+        await log_user_start(
+            context.bot,
+            LOG_CHANNEL_ID,
+            user_id,
+            username,
+            first_name
+        )
+        logger.info(f"✅ Start log sent for user {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Start log failed: {e}")
+    
     if is_user_banned(user_id):
         await update.message.reply_text("🚫 ᴀᴄᴄᴇss ᴅᴇɴɪᴇᴅ\n\nʏᴏᴜʀ ᴀᴄᴄᴏᴜɴᴛ ʜᴀs ʙᴇᴇɴ ʀᴇsᴛʀɪᴄᴛᴇᴅ. ᴄᴏɴᴛᴀᴄᴛ sᴜᴘᴘᴏʀᴛ.", parse_mode="HTML")
         return
     
-    # ====== NEW USER LOG (Only first time) ======
-    # Check if user already has a thumbnail saved (indicates existing user)
-    existing_thumbnail = get_thumbnail(user_id)
-    if existing_thumbnail is None:
-        # This is a new user - log it
-        log_text = (
-            f"🆕 <b>New User Started Bot</b>\n\n"
-            f"👤 <b>Name:</b> {first_name}\n"
-            f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
-            f"👤 <b>Username:</b> @{username if username != 'Unknown' else 'N/A'}\n"
-            f"📅 <b>Date:</b> {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-        )
-        await send_log(context, log_text)
-        
-        # Also log using existing database function
+    user_check = get_thumbnail(user_id)
+    if user_check is None:
         log_data = log_new_user(user_id, username, first_name)
         log_msg = format_log_message(user_id, username, log_data["action"], log_data.get("details", ""))
         await send_log(context, log_msg)
     
-    # Check force-sub first
     if not await check_force_sub(update, context):
         logger.warning(f"❌ User {user_id} blocked by force-sub check")
         return
     
     text = (
-    "Welcome to Cover Changer Bot ✅\n\n"
-    "• Send/forward image or link → Save cover\n"
+    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+    "• Send/forward Image → Save cover\n"
     "• Send/forward video → Apply cover\n"
-    "• /view_cover → View your current cover\n\n"
+    "• /showthumbnail → View cover\n\n"
     "📊 The bot never offline unless maintenance or admin intervention."
 )
 
-    # Build home menu with all buttons
     kb_rows = [
         [InlineKeyboardButton("❓ ʜᴇʟᴘ", callback_data="menu_help"),
          InlineKeyboardButton("ℹ️ ᴀʙᴏᴜᴛ", callback_data="menu_about")],
@@ -1088,14 +1003,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("👨‍💻 ᴅᴇᴠᴇʟᴏᴘᴇʀ", callback_data="menu_developer")],
     ]
     
-    # Add admin panel button if user is admin
     if is_admin(user_id):
         kb_rows.append([InlineKeyboardButton("🛡️ ᴀᴅᴍɪɴ ᴘᴀɴᴇʟ", callback_data="admin_back")])
     
     kb = InlineKeyboardMarkup(kb_rows)
     banner = HOME_MENU_BANNER_URL
     
-    # Handle both callback_query and regular message
     if update.callback_query:
         msg = update.callback_query.message
         if banner:
@@ -1130,7 +1043,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_thumbnail_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show user's saved thumbnail"""
     if not await check_force_sub(update, context):
         return
     
@@ -1245,7 +1157,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
     user_id = update.message.from_user.id
-    # Show thumbnail status
     thumb_status = "✅ sᴀᴠᴇᴅ & ʀᴇᴀᴅʏ" if has_thumbnail(user_id) else "❌ ɴᴏᴛ sᴀᴠᴇᴅ ʏᴇᴛ"
     
     text = (
@@ -1277,34 +1188,56 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
+    
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "Unknown"
     
     if delete_thumbnail(user_id):
-        # Log thumbnail removal
+        try:
+            await log_thumbnail_deleted(
+                context.bot,
+                LOG_CHANNEL_ID,
+                user_id,
+                username
+            )
+            logger.info(f"✅ Delete log sent for user {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Delete log failed: {e}")
+        
         log_data = log_thumbnail_removed(user_id, username)
         log_msg = format_log_message(user_id, username, log_data["action"])
         await send_log(context, log_msg)
         
         return await update.message.reply_text("✅ ᴛʜᴜᴍʙɴᴀɪʟ ʀᴇᴍᴏᴠᴇᴅ\n\nᴅᴇʟᴇᴛᴇᴅ sᴜᴄᴄᴇssꜰᴜʟʟʏ. ᴜᴘʟᴏᴀᴅ ᴀ ɴᴇᴡ ᴏɴᴇ ᴀɴʏᴛɪᴍᴇ!", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    
     await update.message.reply_text("⚠️ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ᴛᴏ ʀᴇᴍᴏᴠᴇ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ!", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
 
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
+    
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "Unknown"
     photo_id = update.message.photo[-1].file_id
     
-    # Check if replacing
+    try:
+        await log_thumb_set(
+            context.bot,
+            LOG_CHANNEL_ID,
+            user_id,
+            username
+        )
+        logger.info(f"✅ Thumbnail log sent for user {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Thumbnail log failed: {e}")
+    
     old_thumbnail = get_thumbnail(user_id)
     is_replace = old_thumbnail is not None
     
     save_thumbnail(user_id, photo_id)
     logger.info(f"✅ Thumbnail saved to MongoDB for user {user_id}")
     
-    # Log thumbnail action
     log_data = log_thumbnail_set(user_id, username, is_replace=is_replace)
     log_msg = format_log_message(user_id, username, log_data["action"])
     await send_log(context, log_msg)
@@ -1316,16 +1249,29 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
+    
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "No Username"
     cover = get_thumbnail(user_id)
+    
     if not cover:
         return await update.message.reply_text("❌ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏᴜɴᴅ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴛʜᴜᴍʙɴᴀɪʟ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    
+    try:
+        await log_video_processed(
+            context.bot,
+            LOG_CHANNEL_ID,
+            user_id,
+            username
+        )
+        logger.info(f"✅ Video log sent for user {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Video log failed: {e}")
+    
     msg = await update.message.reply_text("⏳ ᴘʀᴏᴄᴇssɪɴɢ ᴠɪᴅᴇᴏ\n\nᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ sᴇᴄᴏɴᴅs", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
     video = update.message.video.file_id
     
-    # Get original caption and preserve it
     original_caption = update.message.caption or ""
     new_caption = original_caption
     caption_entities = bold_entities(original_caption)
@@ -1333,10 +1279,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     media = InputMediaVideo(media=video, caption=new_caption,caption_entities=caption_entities, supports_streaming=True, cover=cover)
     
     try:
-        # Edit message with video and cover
         await context.bot.edit_message_media(chat_id=update.effective_chat.id, message_id=msg.message_id, media=media)
         
-        # Forward video to log channel
         if LOG_CHANNEL_ID:
             try:
                 log_caption = (
@@ -1386,7 +1330,6 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.error(f"Update failed - bot not restarting")
             return
 
-        # Update successful - now restart
         await msg.edit_text(
             "✅ <b>ᴜᴘᴅᴀᴛᴇ sᴜᴄᴄᴇssꜰᴜʟ!</b>\n\n"
             "🔄 ʀᴇsᴛᴀʀᴛɪɴɢ ʙᴏᴛ ᴡɪᴛʜ ɴᴇᴡ ᴄʜᴀɴɢᴇs...\n"
@@ -1395,10 +1338,8 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         
         logger.info("✅ Update completed successfully. Restarting bot...")
-        # Give time for message to be sent
         await asyncio.sleep(1)
         
-        # Restart the bot
         os.execv(sys.executable, [sys.executable] + sys.argv)
         
     except Exception as e:
@@ -1415,7 +1356,6 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """═══════════════════ ADMIN COMMANDS ═══════════════════"""
 
 async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show admin control panel"""
     if not await check_admin(update):
         return
     
@@ -1441,7 +1381,6 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ ʙᴀᴄᴋ", callback_data="menu_back")],
     ])
     
-    # Get home menu banner
     banner = HOME_MENU_BANNER_URL
     
     if banner:
@@ -1468,7 +1407,6 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Ban a user - usage: /ban user_id reason"""
     if not await check_admin(update):
         return
     
@@ -1490,7 +1428,6 @@ async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 parse_mode="HTML"
             )
             
-            # Log ban action
             log_data = log_user_banned(user_id, "User", reason)
             log_msg = format_log_message(user_id, "User", log_data["action"], log_data.get("details", ""))
             await send_log(context, log_msg)
@@ -1503,7 +1440,6 @@ async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Unban a user - usage: /unban user_id"""
     if not await check_admin(update):
         return
     
@@ -1519,7 +1455,6 @@ async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if unban_user(user_id):
             await update.message.reply_text("✅ ᴜsᴇʀ " + str(user_id) + " ᴜɴʙᴀɴɴᴇᴅ")
             
-            # Log unban action
             log_data = log_user_unbanned(user_id, "User")
             log_msg = format_log_message(user_id, "User", log_data["action"])
             await send_log(context, log_msg)
@@ -1532,7 +1467,6 @@ async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show bot statistics"""
     if not await check_admin(update):
         return
     
@@ -1547,7 +1481,6 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show bot status (uptime, CPU, RAM)"""
     if not await check_admin(update):
         return
     
@@ -1555,12 +1488,10 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     import time
     
     try:
-        # Bot uptime (from when bot.py started)
         uptime_seconds = time.time() - context.bot_data.get('start_time', time.time())
         uptime_hours = int(uptime_seconds // 3600)
         uptime_mins = int((uptime_seconds % 3600) // 60)
         
-        # System stats
         cpu_percent = psutil.cpu_percent(interval=1)
         ram = psutil.virtual_memory()
         ram_percent = ram.percent
@@ -1587,7 +1518,6 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Broadcast message to all users - usage: /broadcast <message>"""
     if not await check_admin(update):
         return
     
@@ -1605,7 +1535,6 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     message_text = args[1]
     
-    # Show confirmation
     confirm_text = (
         "📢 ʙʀᴏᴀᴅᴄᴀsᴛ ᴄᴏɴꜰɪʀᴍᴀᴛɪᴏɴ\n\n"
         f"📝 ᴍᴇssᴀɢᴇ:\n"
@@ -1616,7 +1545,6 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     msg = await update.message.reply_text(confirm_text, parse_mode="HTML")
     
     try:
-        # Get all user IDs from database
         from database import db
         users_collection = db.get_collection("users")
         all_users = users_collection.find({}, {"user_id": 1})
@@ -1631,7 +1559,6 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             return
         
-        # Send message to all users
         sent = 0
         failed = 0
         
@@ -1647,7 +1574,6 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.warning(f"Could not send broadcast to user {user_id}: {e}")
                 failed += 1
         
-        # Show final status
         result_text = (
             "✅ ʙʀᴏᴀᴅᴄᴀsᴛ ᴄᴏᴍᴘʟᴇᴛᴇᴅ\n\n"
             f"📤 sᴇɴᴛ: {sent}\n"
@@ -1658,7 +1584,6 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await msg.edit_text(result_text, parse_mode="HTML")
         
-        # Log broadcast
         if LOG_CHANNEL_ID:
             log_text = (
                 f"📢 <b>Broadcast Sent</b>\n\n"
@@ -1680,36 +1605,49 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle text messages"""
     if not await check_force_sub(update, context):
         return
+
+
+"""-----------MAIN FUNCTION WITH DEPLOY LOG-----------"""
+
+async def post_init(app: Application):
+    """✅ Bot start/deploy hone par ye log channel mein message bhejega"""
+    logger.info("🚀 Bot is starting up...")
     
-    # Ignore all text messages (don't respond)
-
-
-"""-----------CALLBAck Hnadlers--------"""
-
-
-def main() -> None:
-    app = Application.builder().token(TOKEN).build()
-
-    # Global error handler
-    async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Log all errors"""
-        logger.error(f"🔴 ERROR: {context.error}", exc_info=context.error)
-
-    app.add_error_handler(error_handler)
+    if LOG_CHANNEL_ID:
+        try:
+            # Deploy/Startup log message
+            deploy_message = (
+                "🚀 <b>Bot Deployed Successfully!</b>\n\n"
+                "✅ Bot is now online and running.\n"
+                "📊 Monitoring all user activities.\n"
+                "🟢 Status: <b>Active</b>\n\n"
+                f"📅 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                "🤖 Bot: @CoverChangerBot\n"
+                "👑 Owner: @WOLVERIN_P\n\n"
+                "─" * 20 + "\n"
+                "<i>All user activities will be logged here.</i>"
+            )
+            
+            await app.bot.send_message(
+                chat_id=LOG_CHANNEL_ID,
+                text=deploy_message,
+                parse_mode="HTML"
+            )
+            logger.info("✅ Deploy log sent successfully to channel")
+        except Exception as e:
+            logger.error(f"❌ Failed to send deploy log: {e}")
+            logger.error(f"Channel ID: {LOG_CHANNEL_ID}")
     
-    # Setup bot commands on startup
-    async def setup_commands(app: Application) -> None:
-        """Setup bot commands menu"""
+    # Setup bot commands
+    try:
         from telegram import BotCommand
-        
         commands = [
             BotCommand("start", "🏠 Start bot"),
-            BotCommand("help", "ℹ️ How to use bot"),
+            BotCommand("help", "ℹ️ How to use"),
             BotCommand("about", "🤖 About bot"),
-            BotCommand("settings", "⚙️ Bot settings"),
+            BotCommand("settings", "⚙️ Settings"),
             BotCommand("remove", "🗑️ Remove thumbnail"),
             BotCommand("showthumbnail", "🖼️ Show thumbnail"),
             BotCommand("admin", "🛡️ Admin panel"),
@@ -1719,17 +1657,23 @@ def main() -> None:
             BotCommand("status", "⏱️ Bot status"),
             BotCommand("broadcast", "📢 Broadcast message"),
         ]
-        
-        try:
-            await app.bot.set_my_commands(commands)
-            logger.info("✅ Bot commands configured successfully")
-        except Exception as e:
-            logger.error(f"❌ Error setting bot commands: {e}")
-    
-    # Register post_init callback to setup commands
-    app.post_init = setup_commands
+        await app.bot.set_my_commands(commands)
+        logger.info("✅ Bot commands configured successfully")
+    except Exception as e:
+        logger.error(f"❌ Error setting bot commands: {e}")
 
-    # Command handlers (MUST be registered FIRST before text handler)
+
+def main() -> None:
+    app = Application.builder().token(TOKEN).build()
+
+    async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logger.error(f"🔴 ERROR: {context.error}", exc_info=context.error)
+
+    app.add_error_handler(error_handler)
+    
+    # ✅ POST_INIT - Deploy log ke liye
+    app.post_init = post_init
+
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("about", about, filters=filters.ChatType.PRIVATE))
@@ -1738,7 +1682,6 @@ def main() -> None:
     app.add_handler(CommandHandler("showthumbnail", show_thumbnail_cmd, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("restart", restart, filters=filters.ChatType.PRIVATE))
     
-    # Admin commands
     app.add_handler(CommandHandler("admin", admin_menu, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("ban", ban_cmd, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("unban", unban_cmd, filters=filters.ChatType.PRIVATE))
@@ -1746,32 +1689,15 @@ def main() -> None:
     app.add_handler(CommandHandler("status", status_cmd, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("broadcast", broadcast_cmd, filters=filters.ChatType.PRIVATE))
 
-    # Photo and video handlers (private chats only via filters)
     app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, photo_handler))
     app.add_handler(MessageHandler(filters.VIDEO & filters.ChatType.PRIVATE, video_handler))
     
-    # Text handler for dump channel ID capture (MUST be LAST - only non-command text)
-    # Add filter to exclude commands (messages starting with /)
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, text_handler))
     
-    # Register callback handler (handles all callbacks)
     app.add_handler(CallbackQueryHandler(callback_handler))
 
     logger.info("✅ All handlers registered")
-    logger.info("Bot starting (polling)")
-    
-    # Send deployment log when bot starts
-    try:
-        # Create a dummy context with bot
-        class DummyContext:
-            bot = app.bot
-        
-        dummy_context = DummyContext()
-        # Send deployment log
-        asyncio.create_task(send_deployment_log(dummy_context))
-    except Exception as e:
-        logger.error(f"Failed to send deployment log: {e}")
-    
+    logger.info("🚀 Bot starting...")
     app.run_polling(
         allowed_updates=[
             "message",
