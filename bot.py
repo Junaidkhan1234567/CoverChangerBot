@@ -23,20 +23,21 @@ from database import (
     log_thumbnail_set, log_thumbnail_removed
 )
 from telegram import MessageEntity
-# Import at top
 from flask import Flask
 import threading
 
-# Flask app for health check
 app = Flask(__name__)
 
 @app.route('/')
-def health():
+def health_check():
     return "Bot is running!", 200
 
-def run_web():
-    app.run(host='0.0.0.0', port=8080)
+def run_flask():
+    app.run(host="0.0.0.0", port=8080)
 
+# अपने मुख्य `main()` फंक्शन से पहले यह कोड डालें
+# यह एक अलग थ्रेड में Flask सर्वर शुरू करेगा
+threading.Thread(target=run_flask, daemon=True).start()
 def bold_entities(text: str):
     """Return entities list to make full caption bold"""
     if not text:
