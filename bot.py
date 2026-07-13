@@ -52,7 +52,7 @@ def webhook():
         return "Error", 500
 
 def run_flask():
-    app.run(host="0.0.0.0", port=8080)
+    app.run(host="0.0.0.0", port=1000)
 
 # Flask server in background thread
 threading.Thread(target=run_flask, daemon=True).start()
