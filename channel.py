@@ -415,32 +415,3 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
         "🗑️ <b>Remove Channel</b> – Clear current channel"
     )
     
-    # Dynamic buttons based on channel status
-    keyboard = [
-        [InlineKeyboardButton("📝 Set Channel", callback_data="channel_set")],
-    ]
-    
-    if current_channel:
-        # ═══════ BOTH BUTTONS IN SAME ROW ═══════
-        toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
-        keyboard.append([
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove", callback_data="channel_remove")
-        ])
-        # ═══════════════════════════════════════
-    else:
-        keyboard.append([InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")])
-    
-    keyboard.append([InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")])
-    
-    keyboard_markup = InlineKeyboardMarkup(keyboard)
-    
-    try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
-        await query.answer()
-    except Exception as e:
-        logger.error(f"Error showing channel settings: {e}")
