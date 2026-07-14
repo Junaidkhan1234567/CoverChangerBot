@@ -1,7 +1,6 @@
 # ═══════════════════════════════════════════════════════════
 # Video Cover Bot - Environment Configuration
 # ═══════════════════════════════════════════════════════════
-TIMEZONE=Asia/Kolkata
 
 # ─── TELEGRAM BOT CONFIGURATION ───
 # Required: Telegram bot token from @BotFather
@@ -42,28 +41,9 @@ UPSTREAM_REPO=https://github.com/your_username/your_repo
 UPSTREAM_BRANCH=main
 
 # ═══════════════════════════════════════════════════════════
-#VERIFICATION SYSTEM - COMPLETE TOGGLES
-
-VERIFICATION_ENABLED=True
-VERIFY_START_IMG=https://example.com/verify-start.jpg
-VERIFY_COMPLETE_IMG=https://example.com/verify-complete.jpg
-TUTORIAL_LINK=
-VERIFIED_LOG=-2016227618
-
-# ═══════════════════════════════════════════════════════════
-# 🔗 SHORTLINK SYSTEM - GP LINKS / CUSTOM API
-# ═══════════════════════════════════════════════════════════
-SHORTLINK_ENABLED=True
-SHORTLINK_URL=gplinks.com
-SHORTLINK_API=05f3a1bccfa105188a114bf16d09e6c3b5cb2902
-POST_SHORTLINK_ENABLED=True
-POST_SHORTLINK_URL=gplinks.com
-POST_SHORTLINK_API=05f3a1bccfa105188a114bf16d09e6c3b5cb2902
-VERIFY_EXPIRE=3600
-
-# ═══════════════════════════════════════════════════════════
 # SETUP INSTRUCTIONS:
 # 1. Copy this file to config.env
 # 2. Fill in all the values above
 # 3. Run: python bot.py
 # ═══════════════════════════════════════════════════════════
+
