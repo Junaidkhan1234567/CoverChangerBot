@@ -1293,6 +1293,12 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     clean_caption = re.sub(url_pattern, '', original_caption).strip()
     clean_caption = ' '.join(clean_caption.split())
     
+    # ═══════════ GET SAVED CHANNEL ═══════════
+    from channel import get_user_channel
+    saved_channel = get_user_channel(user_id)
+    logger.info(f"📌 User {user_id} saved channel: {saved_channel}")
+    # ════════════════════════════════════════
+    
     media = InputMediaVideo(
         media=video, 
         caption=clean_caption,
@@ -1301,11 +1307,42 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     try:
+        # ✅ UPDATE ORIGINAL MESSAGE
         await context.bot.edit_message_media(
             chat_id=update.effective_chat.id, 
             message_id=msg.message_id, 
             media=media
         )
+        
+        # ═══════════ SEND TO SAVED CHANNEL ═══════════
+        if saved_channel:
+            try:
+                await context.bot.send_video(
+                    chat_id=saved_channel,
+                    video=video,
+                    caption=f"📹 <b>Video from user</b>\n\n"
+                            f"👤 User: @{username}\n"
+                            f"🆔 ID: <code>{user_id}</code>\n"
+                            f"📝 Caption: {clean_caption or 'No caption'}",
+                    supports_streaming=True,
+                    thumbnail=cover,
+                    parse_mode="HTML"
+                )
+                logger.info(f"✅ Video sent to saved channel {saved_channel} for user {user_id}")
+                
+                await update.message.reply_text(
+                    f"✅ ᴠɪᴅᴇᴏ sᴇɴᴛ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ!",
+                    parse_mode="HTML"
+                )
+                
+            except Exception as e:
+                logger.error(f"❌ Error sending video to channel: {e}")
+                await update.message.reply_text(
+                    f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
+                    f"ᴍᴀᴋᴇ sᴜʀᴇ ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!",
+                    parse_mode="HTML"
+                )
+        # ══════════════════════════════════════════════
         
         if LOG_CHANNEL_ID:
             try:
@@ -1314,6 +1351,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"👤 ᴜsᴇʀ ɪᴅ: <code>{user_id}</code>\n"
                     f"📌 ᴜsᴇʀɴᴀᴍᴇ: @{username}\n"
                     f"📝 ᴄᴀᴘᴛɪᴏɴ: {clean_caption or 'ɴᴏ ᴄᴀᴘᴛɪᴏɴ'}\n"
+                    f"📢 ᴄʜᴀɴɴᴇʟ: {saved_channel or 'ɴᴏᴛ sᴇᴛ'}\n"
                     f"⏰ ᴛɪᴍᴇsᴛᴀᴍᴘ: {update.message.date}"
                 )
                 await context.bot.send_video(
