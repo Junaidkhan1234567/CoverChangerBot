@@ -2,6 +2,7 @@ import os
 import logging
 from datetime import datetime
 from pymongo import MongoClient
+from database import get_user_sync, update_user_sync
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -311,9 +312,6 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
 # ============ VERIFICATION DATABASE FUNCTIONS ============
 # Add these functions to your existing database.py
 # verification.py - Replace db.get_user with sync version
-
-from database import get_user_sync, update_user_sync
-
 async def is_user_verified(user_id: int) -> bool:
     """Check if user is verified"""
     if not VERIFICATION_ENABLED:
