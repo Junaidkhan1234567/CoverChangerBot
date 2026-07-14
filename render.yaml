@@ -1,25 +1,17 @@
 services:
-  - type: web
+  - type: worker
     name: CoverChangerBot
     runtime: docker
     plan: free
     dockerfilePath: ./Dockerfile
     envVars:
       - key: BOT_TOKEN
-        value: 8926558349:AAHxDhbHL_kL9wsRCSMduY_0mC_2K7gW5ZI
+        sync: false  # Ye Render dashboard mein dalna
       - key: OWNER_ID
-        value: 1383239349
-      - key: OWNER_USERNAME
-        value: WOLVERIN_P
-      - key: FORCE_SUB_CHANNEL_ID
-        value: -1002659719637
-      - key: LOG_CHANNEL_ID
-        value: -1002659719637
+        sync: false
       - key: MONGODB_URI
-        value: mongodb+srv://junaidkhan:Junaidkhan123456789@cluster0.afkkh.mongodb.net/
-      - key: MONGODB_DATABASE
-        value: video_cover_bot
-      - key: FORCE_SUB_BANNER_URL
-        value: ""
-      - key: HOME_MENU_BANNER_URL
-        value: ""
+        sync: false
+      - key: FORCE_SUB_CHANNEL_ID
+        sync: false
+      - key: LOG_CHANNEL_ID
+        sync: false
