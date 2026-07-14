@@ -27,14 +27,16 @@ from database import (
 from telegram import MessageEntity
 from flask import Flask
 import threading
+
+# ═══════════ CHANNEL IMPORTS ═══════════
 from channel import (
     show_channel_settings,
     channel_set_prompt,
     channel_remove,
     handle_channel_id_input,
-    get_user_channel,
-    save_user_channel
+    register_channel_handlers
 )
+# ═══════════════════════════════════════
 
 # ✅ LOG UTILS IMPORT
 from log_utils import (
@@ -394,6 +396,20 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user_id = query.from_user.id
     logger.info(f"👤 User ID: {user_id} | Channel ID Config: {FORCE_SUB_CHANNEL_ID}")
+    
+    # ═══════════ CHANNEL SETTINGS CALLBACKS ═══════════
+    if query.data == "channel_settings":
+        await show_channel_settings(update, context)
+        return
+    
+    if query.data == "channel_set":
+        await channel_set_prompt(update, context)
+        return
+    
+    if query.data == "channel_remove":
+        await channel_remove(update, context)
+        return
+    # ════════════════════════════════════════════════════
     
     if query.data == "check_fsub":
         logger.info(f"🔍 Verify button clicked by user {user_id}")
@@ -1622,6 +1638,14 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
+    
+    # ═══════════ CHECK CHANNEL ID INPUT ═══════════
+    if await handle_channel_id_input(update, context):
+        return
+    # ══════════════════════════════════════════════
+    
+    # Handle other text inputs
+    await update.message.reply_text("❓ Unknown command. Use /help for assistance.")
 
 
 """-----------MAIN FUNCTION-----------"""
@@ -1682,7 +1706,9 @@ def main() -> None:
     # ✅ POST_INIT - Deploy log ke liye
     app.post_init = post_init
 
+    # ═══════════ REGISTER CHANNEL HANDLERS ═══════════
     register_channel_handlers(app)
+    # ══════════════════════════════════════════════════
 
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
