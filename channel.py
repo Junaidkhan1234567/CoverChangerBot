@@ -3,26 +3,46 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
+from database import db  # <-- MongoDB database import
 
 logger = logging.getLogger(__name__)
 
-# Database functions for channel management
+# ═══════════════════ DATABASE FUNCTIONS ═══════════════════
 def get_user_channel(user_id: int) -> str:
-    """Get user's saved channel ID"""
-    if not hasattr(get_user_channel, 'channels'):
-        get_user_channel.channels = {}
-    return get_user_channel.channels.get(str(user_id), None)
+    """Get user's saved channel ID from database"""
+    try:
+        users_collection = db.get_collection("users")
+        user_data = users_collection.find_one({"user_id": user_id})
+        if user_data and "channel_id" in user_data:
+            return user_data["channel_id"]
+        return None
+    except Exception as e:
+        logger.error(f"Error getting channel: {e}")
+        return None
 
 def save_user_channel(user_id: int, channel_id: str) -> None:
-    """Save user's channel ID"""
-    if not hasattr(save_user_channel, 'channels'):
-        save_user_channel.channels = {}
-    if channel_id is None:
-        if str(user_id) in save_user_channel.channels:
-            del save_user_channel.channels[str(user_id)]
-    else:
-        save_user_channel.channels[str(user_id)] = channel_id
+    """Save user's channel ID to database"""
+    try:
+        users_collection = db.get_collection("users")
+        if channel_id is None:
+            # Remove channel_id from user document
+            users_collection.update_one(
+                {"user_id": user_id},
+                {"$unset": {"channel_id": ""}},
+                upsert=True
+            )
+        else:
+            # Save channel_id
+            users_collection.update_one(
+                {"user_id": user_id},
+                {"$set": {"channel_id": channel_id}},
+                upsert=True
+            )
+        logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
+    except Exception as e:
+        logger.error(f"Error saving channel: {e}")
 
+# ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show channel settings menu"""
     query = update.callback_query
@@ -105,7 +125,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⬅️ Back", callback_data="channel_settings")]
         ])
     else:
-        save_user_channel(user_id, None)
+        save_user_channel(user_id, None)  # Remove from database
         text = (
             "🗑️ <b>Channel Removed</b>\n\n"
             f"Removed: <code>{current_channel}</code>\n\n"
@@ -151,7 +171,10 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             chat = await context.bot.get_chat(chat_id=channel_id)
             channel_name = chat.title or "Unknown Channel"
             
+            # ═══════ SAVE TO DATABASE ═══════
             save_user_channel(user_id, channel_id)
+            # ═══════════════════════════════
+            
             context.user_data['awaiting_channel_id'] = False
             
             text = (
@@ -167,6 +190,11 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             ])
             
             await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+            
+            # ═══════ DEBUG LOG ═══════
+            logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
+            # ════════════════════════
+            
             return True
             
         except BadRequest as e:
@@ -218,20 +246,16 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="HTML"
         )
 
-# ============== HANDLER REGISTRATION FUNCTION ==============
-
+# ═══════════════════ REGISTER HANDLERS ═══════════════════
 def register_channel_handlers(app):
     """Register all channel-related handlers with the bot application"""
     
-    # Callback query handlers
     app.add_handler(CallbackQueryHandler(show_channel_settings, pattern="^channel_settings$"))
     app.add_handler(CallbackQueryHandler(channel_set_prompt, pattern="^channel_set$"))
     app.add_handler(CallbackQueryHandler(channel_remove, pattern="^channel_remove$"))
     
-    # Command handler for cancel
     app.add_handler(CommandHandler("cancel", cancel_channel_setup))
     
-    # Message handler for channel ID input
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, 
         handle_channel_id_input
