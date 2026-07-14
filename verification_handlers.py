@@ -1,3 +1,4 @@
+# verification_handlers.py
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes
 import logging
@@ -7,22 +8,18 @@ from verification import (
     create_verification, verify_user, is_user_verified,
     send_verification_alert, send_verification_success,
     reset_user_verification, send_verification_log,
-    toggle_verification, toggle_shortlink
+    toggle_verification, toggle_shortlink, check_verification
 )
 from database import db
 
 logger = logging.getLogger(__name__)
 
-# Owner Username from env
 OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "")
-
-# ============ HANDLE VERIFICATION START ============
 
 async def handle_verification_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /start verify_xxx_xxx"""
     user_id = update.effective_user.id
     
-    # Check if this is a verification request
     if context.args and len(context.args) > 0:
         arg = context.args[0]
         
@@ -33,44 +30,31 @@ async def handle_verification_start(update: Update, context: ContextTypes.DEFAUL
                 target_user_id = int(parts[1])
                 verify_id = parts[2]
                 
-                # Check if correct user
                 if user_id != target_user_id:
                     await update.message.reply_text(
-                        "❌ <b>This link is not for you!</b>\n\n"
-                        "Please use your own verification link.",
+                        "❌ <b>This link is not for you!</b>",
                         parse_mode="HTML"
                     )
                     return
                 
-                # Try to verify
                 if await verify_user(user_id, verify_id):
-                    # ✅ Success
                     await send_verification_success(update, context)
-                    
-                    # Log to channel
                     await send_verification_log(context, user_id, "✅ Verified")
                 else:
-                    # ❌ Failed
                     await update.message.reply_text(
-                        "❌ <b>Invalid or Expired Link!</b>\n\n"
-                        "Please try again.\n\n"
-                        "💡 Need help? Contact admin.",
+                        "❌ <b>Invalid or Expired Link!</b>\n\nPlease try again.",
                         parse_mode="HTML"
                     )
                 return
     
-    # Normal start - existing start function call karo
     from bot import start
     await start(update, context)
-
-# ============ CALLBACK HANDLERS ============
 
 async def verification_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle verification callbacks"""
     query = update.callback_query
     user_id = query.from_user.id
     
-    # Check admin for toggle
     from bot import is_admin
     
     if query.data == "toggle_verify":
@@ -78,15 +62,18 @@ async def verification_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await query.answer("❌ Unauthorized!", show_alert=True)
             return
         
-        from verification import IS_VERIFY
-        IS_VERIFY = not IS_VERIFY
-        status = "🟢 ON" if IS_VERIFY else "🔴 OFF"
+        from verification import VERIFICATION_ENABLED
+        VERIFICATION_ENABLED = not VERIFICATION_ENABLED
+        status = "🟢 ON" if VERIFICATION_ENABLED else "🔴 OFF"
+        
+        from verification import VERIFY_EXPIRE
+        expire_minutes = VERIFY_EXPIRE // 60
         
         text = f"""🎛️ <b>Verification Toggle</b>
 
 📊 Status: {status}
 
-Users will {'need to verify' if IS_VERIFY else 'not need to verify'} before sending videos."""
+Users will {'need to verify every ' + str(expire_minutes) + ' minutes' if VERIFICATION_ENABLED else 'not need to verify'} before sending videos."""
         
         await query.message.edit_text(
             text,
@@ -103,15 +90,15 @@ Users will {'need to verify' if IS_VERIFY else 'not need to verify'} before send
             await query.answer("❌ Unauthorized!", show_alert=True)
             return
         
-        from verification import USE_SHORTLINK
-        USE_SHORTLINK = not USE_SHORTLINK
-        status = "🟢 ON" if USE_SHORTLINK else "🔴 OFF"
+        from verification import SHORTLINK_ENABLED
+        SHORTLINK_ENABLED = not SHORTLINK_ENABLED
+        status = "🟢 ON" if SHORTLINK_ENABLED else "🔴 OFF"
         
         text = f"""🔗 <b>Shortlink Toggle</b>
 
 📊 Status: {status}
 
-Verification links will {'use shortlink' if USE_SHORTLINK else 'use direct link'}."""
+Verification links will {'use shortlink' if SHORTLINK_ENABLED else 'use direct link'}."""
         
         await query.message.edit_text(
             text,
@@ -136,26 +123,19 @@ Get premium and skip verification!
 • Direct access
 
 👨‍💻 <b>Contact Admin:</b>
-@{OWNER_USERNAME}
-
-💳 <b>Payment:</b>
-Contact admin for payment details."""
+@{OWNER_USERNAME}"""
         
         buttons = InlineKeyboardMarkup([
             [InlineKeyboardButton("👨‍💻 Contact Admin", url=f"https://t.me/{OWNER_USERNAME}")],
             [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
         ])
         
-        try:
-            await query.message.edit_text(
-                text,
-                reply_markup=buttons,
-                parse_mode="HTML"
-            )
-        except Exception as e:
-            logger.error(f"Failed to edit message: {e}")
-            await query.message.reply_text(
-                text,
-                reply_markup=buttons,
-                parse_mode="HTML"
-            )
+        await query.message.edit_text(
+            text,
+            reply_markup=buttons,
+            parse_mode="HTML"
+        )
+    
+    elif query.data == "verify_now":
+        await query.answer()
+        await send_verification_alert(update, context)
