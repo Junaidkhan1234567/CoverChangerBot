@@ -134,7 +134,7 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     
     if current_channel:
         # Add toggle forward button
-        toggle_text = "📤 Disable Forward" if forward_enabled else "📤 Enable Forward"
+        toggle_text = "Forward OFF 🔴" if forward_enabled else "Forward ON 🟢"
         keyboard.append([InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward")])
         keyboard.append([InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")])
     else:
