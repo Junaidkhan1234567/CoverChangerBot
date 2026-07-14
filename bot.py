@@ -733,7 +733,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 settings_kb = InlineKeyboardMarkup([
                     [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-                    [InlineKeyboardButton("🔗 Set Channel", callback_data="channel_settings")],
+                    [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_settings")],
                     [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
                 ])
                 try:
