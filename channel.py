@@ -134,9 +134,11 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     
     if current_channel:
         # Add toggle forward button
-        toggle_text = "Forward OFF 🔴" if forward_enabled else "Forward ON 🟢"
-        keyboard.append([InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward")])
-        keyboard.append([InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")])
+        toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
+        keyboard.append([
+            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
+            InlineKeyboardButton("🗑️ Remove", callback_data="channel_remove")
+        ]) 
     else:
         keyboard.append([InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")])
     
@@ -386,3 +388,59 @@ def register_channel_handlers(app):
     
     logger.info("✅ Channel handlers registered successfully")
     return app
+
+
+async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show channel settings menu"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    current_channel = get_user_channel(user_id)
+    forward_enabled = get_forward_enabled(user_id)
+    
+    text = "🔗 <b>Channel Settings</b>\n\n"
+    text += "Set a channel where the bot will send processed videos.\n\n"
+    
+    if current_channel:
+        text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n"
+        forward_status = "✅ Enabled" if forward_enabled else "❌ Disabled"
+        text += f"📤 <b>Forward to Channel:</b> {forward_status}\n\n"
+    else:
+        text += "❌ <b>No channel set yet</b>\n\n"
+    
+    text += (
+        "<b>Options:</b>\n"
+        "📝 <b>Set Channel</b> – Send new channel ID\n"
+        "📤 <b>Toggle Forward</b> – Enable/disable forwarding\n"
+        "🗑️ <b>Remove Channel</b> – Clear current channel"
+    )
+    
+    # Dynamic buttons based on channel status
+    keyboard = [
+        [InlineKeyboardButton("📝 Set Channel", callback_data="channel_set")],
+    ]
+    
+    if current_channel:
+        # ═══════ BOTH BUTTONS IN SAME ROW ═══════
+        toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
+        keyboard.append([
+            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
+            InlineKeyboardButton("🗑️ Remove", callback_data="channel_remove")
+        ])
+        # ═══════════════════════════════════════
+    else:
+        keyboard.append([InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")])
+    
+    keyboard.append([InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")])
+    
+    keyboard_markup = InlineKeyboardMarkup(keyboard)
+    
+    try:
+        msg = query.message
+        if hasattr(msg, "photo") and msg.photo:
+            await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
+        else:
+            await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
+        await query.answer()
+    except Exception as e:
+        logger.error(f"Error showing channel settings: {e}")
