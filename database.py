@@ -310,55 +310,66 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
 
 # ============ VERIFICATION DATABASE FUNCTIONS ============
 # Add these functions to your existing database.py
+# verification.py - Replace db.get_user with sync version
 
-async def get_user(user_id: int) -> dict:
-    """Get user data"""
-    if not DB_AVAILABLE:
-        return None
-    
-    try:
-        user = users_collection.find_one({"user_id": user_id})
-        return user
-    except Exception as e:
-        logger.error(f"Error getting user: {e}")
-        return None
+from database import get_user_sync, update_user_sync
 
-async def update_user(user_id: int, data: dict) -> bool:
-    """Update user data"""
-    if not DB_AVAILABLE:
-        return False
-    
-    try:
-        users_collection.update_one(
-            {"user_id": user_id},
-            {"$set": data},
-            upsert=True
-        )
+async def is_user_verified(user_id: int) -> bool:
+    """Check if user is verified"""
+    if not VERIFICATION_ENABLED:
         return True
-    except Exception as e:
-        logger.error(f"Error updating user: {e}")
+    
+    # Use sync function instead of async
+    user = get_user_sync(user_id)
+    
+    if not user:
         return False
-
-async def get_all_users() -> list:
-    """Get all users"""
-    if not DB_AVAILABLE:
-        return []
     
-    try:
-        users = users_collection.find({})
-        return list(users)
-    except Exception as e:
-        logger.error(f"Error getting users: {e}")
-        return []
-
-async def get_verified_users_count() -> int:
-    """Get count of verified users"""
-    if not DB_AVAILABLE:
-        return 0
+    if not user.get("is_verified", False):
+        return False
     
-    try:
-        count = users_collection.count_documents({"is_verified": True})
-        return count
-    except Exception as e:
-        logger.error(f"Error counting verified users: {e}")
-        return 0
+    verified_at = user.get("verified_at")
+    if verified_at:
+        expire_seconds = VERIFY_EXPIRE
+        if datetime.now() - verified_at > timedelta(seconds=expire_seconds):
+            update_user_sync(user_id, {
+                "is_verified": False,
+                "verified_at": None
+            })
+            return False
+    
+    return True
+
+async def create_verification(user_id: int) -> str:
+    """Create new verification for user"""
+    verify_id = generate_verify_id()
+    link_expiry_seconds = VERIFY_EXPIRE
+    
+    update_user_sync(user_id, {
+        "verify_id": verify_id,
+        "verify_created": datetime.now(),
+        "verify_expires": datetime.now() + timedelta(seconds=link_expiry_seconds),
+        "is_verified": False,
+        "verified_at": None
+    })
+    
+    return verify_id
+
+async def verify_user(user_id: int, verify_id: str) -> bool:
+    """Verify user with ID"""
+    user = get_user_sync(user_id)
+    
+    if not user:
+        return False
+    
+    if user.get("verify_id") == verify_id:
+        if datetime.now() < user.get("verify_expires", datetime.now()):
+            update_user_sync(user_id, {
+                "is_verified": True,
+                "verified_at": datetime.now()
+            })
+            update_user_sync(user_id, {"verify_id": None, "verify_expires": None})
+            return True
+    
+    return False
+
