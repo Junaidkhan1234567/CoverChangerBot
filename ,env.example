@@ -48,13 +48,13 @@ VERIFICATION_ENABLED=True
 VERIFY_START_IMG=https://example.com/verify-start.jpg
 VERIFY_COMPLETE_IMG=https://example.com/verify-complete.jpg
 TUTORIAL_LINK=
-VERIFIED_LOG=-1002659719637
+VERIFIED_LOG=-2016227618
 
 # ═══════════════════════════════════════════════════════════
 # 🔗 SHORTLINK SYSTEM - GP LINKS / CUSTOM API
 # ═══════════════════════════════════════════════════════════
 SHORTLINK_ENABLED=True
-SHORTLINK_URL=gplinks
+SHORTLINK_URL=gplinks.com
 SHORTLINK_API=05f3a1bccfa105188a114bf16d09e6c3b5cb2902
 POST_SHORTLINK_ENABLED=True
 POST_SHORTLINK_URL=gplinks.com
