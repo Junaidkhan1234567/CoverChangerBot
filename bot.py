@@ -1299,48 +1299,75 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.info(f"📌 User {user_id} saved channel: {saved_channel}")
     # ════════════════════════════════════════
     
+    # ═══════════ USER KO VIDEO SEND (with cover) ═══════════
     media = InputMediaVideo(
         media=video, 
         caption=clean_caption,
         supports_streaming=True, 
-        cover=cover
+        cover=cover  # <-- User ke liye cover laga ke send
     )
     
     try:
-        # ✅ UPDATE ORIGINAL MESSAGE
+        # ✅ USER KO VIDEO SEND (cover ke sath)
         await context.bot.edit_message_media(
             chat_id=update.effective_chat.id, 
             message_id=msg.message_id, 
             media=media
         )
+        logger.info(f"✅ Video sent to user {user_id} with cover")
         
-        # ═══════════ SEND TO SAVED CHANNEL ═══════════
+        # ═══════════ CHANNEL KO VIDEO SEND (cover ke sath) ═══════════
         if saved_channel:
             try:
+                # ✅ CHANNEL KO BHI WAISE HI VIDEO SEND (cover ke sath)
                 await context.bot.send_video(
                     chat_id=saved_channel,
                     video=video,
-                    caption=f" {clean_caption or 'No caption'}",
+                    caption=f"📹 <b>Video from user</b>\n\n"
+                            f"👤 User: @{username}\n"
+                            f"🆔 ID: <code>{user_id}</code>\n"
+                            f"📝 Caption: {clean_caption or 'No caption'}",
                     supports_streaming=True,
-                    thumbnail=cover,
-                    parse_mode="HTML"
+                    thumbnail=cover,  # <-- Channel ke liye bhi cover laga ke send
+                    parse_mode="HTML",
+                    width=update.message.video.width,
+                    height=update.message.video.height,
+                    duration=update.message.video.duration
                 )
-                logger.info(f"✅ Video sent to saved channel {saved_channel} for user {user_id}")
+                logger.info(f"✅ Video sent to saved channel {saved_channel} with cover")
                 
                 await update.message.reply_text(
-                    f"✅ ᴠɪᴅᴇᴏ sᴇɴᴛ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ!",
+                    f"✅ ᴠɪᴅᴇᴏ sᴇɴᴛ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴡɪᴛʜ ᴄᴏᴠᴇʀ!",
                     parse_mode="HTML"
                 )
                 
             except Exception as e:
                 logger.error(f"❌ Error sending video to channel: {e}")
-                await update.message.reply_text(
-                    f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
-                    f"ᴍᴀᴋᴇ sᴜʀᴇ ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!",
-                    parse_mode="HTML"
-                )
+                # ═══════ RETRY: Bina cover ke send karein ═══════
+                try:
+                    await context.bot.send_video(
+                        chat_id=saved_channel,
+                        video=video,
+                        caption=f"📹 <b>Video from user</b>\n\n"
+                                f"👤 User: @{username}",
+                        supports_streaming=True,
+                        parse_mode="HTML"
+                    )
+                    logger.info(f"✅ Video sent without cover to channel {saved_channel}")
+                    await update.message.reply_text(
+                        f"⚠️ ᴠɪᴅᴇᴏ sᴇɴᴛ ʙᴜᴛ ᴄᴏᴠᴇʀ ᴄᴏᴜʟᴅ ɴᴏᴛ ʙᴇ ᴀᴛᴛᴀᴄʜᴇᴅ",
+                        parse_mode="HTML"
+                    )
+                except Exception as e2:
+                    logger.error(f"❌ Error sending video without cover: {e2}")
+                    await update.message.reply_text(
+                        f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
+                        f"ᴍᴀᴋᴇ sᴜʀᴇ ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!",
+                        parse_mode="HTML"
+                    )
         # ══════════════════════════════════════════════
         
+        # ✅ LOG CHANNEL
         if LOG_CHANNEL_ID:
             try:
                 log_caption = (
