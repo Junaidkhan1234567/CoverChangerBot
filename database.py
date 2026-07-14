@@ -2,7 +2,6 @@ import os
 import logging
 from datetime import datetime
 from pymongo import MongoClient
-from database import get_user_sync, update_user_sync
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -308,66 +307,3 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
     action = "🗑️ Thumbnail Removed"
     logger.info(f"✅ {action} - {username} ({user_id})")
     return create_log_entry(user_id, username, action)
-
-# ============ VERIFICATION DATABASE FUNCTIONS ============
-# Add these functions to your existing database.py
-# verification.py - Replace db.get_user with sync version
-async def is_user_verified(user_id: int) -> bool:
-    """Check if user is verified"""
-    if not VERIFICATION_ENABLED:
-        return True
-    
-    # Use sync function instead of async
-    user = get_user_sync(user_id)
-    
-    if not user:
-        return False
-    
-    if not user.get("is_verified", False):
-        return False
-    
-    verified_at = user.get("verified_at")
-    if verified_at:
-        expire_seconds = VERIFY_EXPIRE
-        if datetime.now() - verified_at > timedelta(seconds=expire_seconds):
-            update_user_sync(user_id, {
-                "is_verified": False,
-                "verified_at": None
-            })
-            return False
-    
-    return True
-
-async def create_verification(user_id: int) -> str:
-    """Create new verification for user"""
-    verify_id = generate_verify_id()
-    link_expiry_seconds = VERIFY_EXPIRE
-    
-    update_user_sync(user_id, {
-        "verify_id": verify_id,
-        "verify_created": datetime.now(),
-        "verify_expires": datetime.now() + timedelta(seconds=link_expiry_seconds),
-        "is_verified": False,
-        "verified_at": None
-    })
-    
-    return verify_id
-
-async def verify_user(user_id: int, verify_id: str) -> bool:
-    """Verify user with ID"""
-    user = get_user_sync(user_id)
-    
-    if not user:
-        return False
-    
-    if user.get("verify_id") == verify_id:
-        if datetime.now() < user.get("verify_expires", datetime.now()):
-            update_user_sync(user_id, {
-                "is_verified": True,
-                "verified_at": datetime.now()
-            })
-            update_user_sync(user_id, {"verify_id": None, "verify_expires": None})
-            return True
-    
-    return False
-
