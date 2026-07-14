@@ -27,6 +27,14 @@ from database import (
 from telegram import MessageEntity
 from flask import Flask
 import threading
+from channel import (
+    show_channel_settings,
+    channel_set_prompt,
+    channel_remove,
+    handle_channel_id_input,
+    get_user_channel,
+    save_user_channel
+)
 
 # ✅ LOG UTILS IMPORT
 from log_utils import (
