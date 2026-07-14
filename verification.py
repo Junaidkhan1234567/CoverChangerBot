@@ -12,65 +12,128 @@ from database import db
 
 logger = logging.getLogger(__name__)
 
-# ============ ENVIRONMENT VARIABLES SE READ KAREIN ============
+# ═══════════════════════════════════════════════════════════
+# 🔐 VERIFICATION SYSTEM - ALL TOGGLES
+# ═══════════════════════════════════════════════════════════
 
-# Verification Toggle
-IS_VERIFY = os.environ.get("IS_VERIFY", "True").lower() == "true"
+# ─── VERIFICATION TOGGLES ───
+VERIFICATION_ENABLED = os.environ.get("VERIFICATION_ENABLED", "True").lower() == "true"
 
-# Shortlink Toggle
-USE_SHORTLINK = os.environ.get("USE_SHORTLINK", "True").lower() == "true"
-
-# Shortlink API
-SHORTLINK_API = os.environ.get("SHORTLINK_API", "gplinks.com")
-SHORTLINK_API_KEY = os.environ.get("SHORTLINK_API_KEY", "05f3a1bccfa105188a114bf16d09e6c3b5cb2902")
-
-# Images
+# ─── VERIFICATION IMAGES ───
 VERIFY_START_IMG = os.environ.get("VERIFY_START_IMG", "")
 VERIFY_COMPLETE_IMG = os.environ.get("VERIFY_COMPLETE_IMG", "")
 
-# Tutorial Link
-TUTORIAL_LINK = os.environ.get("TUTORIAL_LINK", "https://t.me")
+# ─── TUTORIAL LINK ───
+TUTORIAL_LINK = os.environ.get("TUTORIAL_LINK", "")
 
-# Log Channel
+# ─── LOG CHANNEL ───
 VERIFIED_LOG = os.environ.get("VERIFIED_LOG", "")
 
-# Timezone
+# ─── TIMEZONE ───
 TIMEZONE = os.environ.get("TIMEZONE", "Asia/Kolkata")
 
-# Owner Username
+# ─── OWNER ───
 OWNER_USERNAME = os.environ.get("OWNER_USERNAME", "")
 
-# In-memory cache for verification
-verification_cache = {}
+# ─── SHORTLINK CONFIG ───
+SHORTLINK_ENABLED = os.environ.get("SHORTLINK_ENABLED", "True").lower() == "true"
+SHORTLINK_URL = os.environ.get("SHORTLINK_URL", "gplinks.com")
+SHORTLINK_API = os.environ.get("SHORTLINK_API", "")
+
+# ─── POST SHORTLINK CONFIG ───
+POST_SHORTLINK_ENABLED = os.environ.get("POST_SHORTLINK_ENABLED", "True").lower() == "true"
+POST_SHORTLINK_URL = os.environ.get("POST_SHORTLINK_URL", "gplinks.com")
+POST_SHORTLINK_API = os.environ.get("POST_SHORTLINK_API", "")
+
+# ─── VERIFICATION EXPIRY ───
+VERIFY_EXPIRE = int(os.environ.get("VERIFY_EXPIRE", "3600"))  # Seconds
+
+# ═══════════════════════════════════════════════════════════
+
+logger.info("🔐 VERIFICATION SETTINGS:")
+logger.info(f"VERIFICATION_ENABLED: {VERIFICATION_ENABLED}")
+logger.info(f"SHORTLINK_ENABLED: {SHORTLINK_ENABLED}")
+logger.info(f"SHORTLINK_URL: {SHORTLINK_URL}")
+logger.info(f"POST_SHORTLINK_ENABLED: {POST_SHORTLINK_ENABLED}")
+logger.info(f"POST_SHORTLINK_URL: {POST_SHORTLINK_URL}")
+logger.info(f"VERIFY_EXPIRE: {VERIFY_EXPIRE} seconds ({VERIFY_EXPIRE//60} minutes)")
 
 # ============ SHORTLINK GENERATOR ============
 
 async def get_shortlink(long_url: str) -> str:
-    """Generate shortlink using API"""
-    if not USE_SHORTLINK:
+    """Generate shortlink using GP Links or Custom API"""
+    if not SHORTLINK_ENABLED:
+        logger.info("📌 SHORTLINK_ENABLED is False, using direct link")
         return long_url
     
-    if not SHORTLINK_API or not SHORTLINK_API_KEY:
-        logger.warning("Shortlink API or API Key not configured")
+    if not SHORTLINK_URL:
+        logger.warning("⚠️ SHORTLINK_URL not configured")
         return long_url
     
     try:
-        # Example using shorte.st API
+        # GP Links / Custom API format
         async with aiohttp.ClientSession() as session:
+            # Different APIs have different formats
+            # GP Links format
             data = {
-                "urlToShorten": long_url,
-                "apiKey": SHORTLINK_API_KEY
+                "api": SHORTLINK_API,
+                "url": long_url,
+                "type": "json"  # or "text" depending on API
             }
             
-            async with session.post(SHORTLINK_API, json=data) as response:
+            # Add https:// if not present
+            api_url = f"https://{SHORTLINK_URL}/api"
+            
+            async with session.post(api_url, json=data) as response:
                 if response.status == 200:
                     result = await response.json()
-                    return result.get("shortenedUrl", long_url)
+                    short_url = result.get("shortenedUrl") or result.get("shorturl") or result.get("short_link")
+                    if short_url and short_url.startswith("http"):
+                        logger.info(f"✅ Shortlink generated: {short_url}")
+                        return short_url
+                    return long_url
                 else:
-                    logger.warning(f"Shortlink API error: {response.status}")
+                    logger.warning(f"⚠️ Shortlink API error: {response.status}")
                     return long_url
     except Exception as e:
-        logger.error(f"Shortlink generation failed: {e}")
+        logger.error(f"❌ Shortlink generation failed: {e}")
+        return long_url
+
+# ============ POST SHORTLINK GENERATOR ============
+
+async def get_post_shortlink(long_url: str) -> str:
+    """Generate shortlink for posts/files using GP Links"""
+    if not POST_SHORTLINK_ENABLED:
+        logger.info("📌 POST_SHORTLINK_ENABLED is False, using direct link")
+        return long_url
+    
+    if not POST_SHORTLINK_URL:
+        logger.warning("⚠️ POST_SHORTLINK_URL not configured")
+        return long_url
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            data = {
+                "api": POST_SHORTLINK_API,
+                "url": long_url,
+                "type": "json"
+            }
+            
+            api_url = f"https://{POST_SHORTLINK_URL}/api"
+            
+            async with session.post(api_url, json=data) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    short_url = result.get("shortenedUrl") or result.get("shorturl") or result.get("short_link")
+                    if short_url and short_url.startswith("http"):
+                        logger.info(f"✅ Post shortlink generated: {short_url}")
+                        return short_url
+                    return long_url
+                else:
+                    logger.warning(f"⚠️ Post Shortlink API error: {response.status}")
+                    return long_url
+    except Exception as e:
+        logger.error(f"❌ Post shortlink generation failed: {e}")
         return long_url
 
 # ============ VERIFICATION ID GENERATOR ============
@@ -82,36 +145,50 @@ def generate_verify_id():
 # ============ VERIFICATION FUNCTIONS ============
 
 async def is_user_verified(user_id: int) -> bool:
-    """Check if user is verified"""
-    # Agar verification OFF hai toh sabko verified maano
-    if not IS_VERIFY:
+    """Check if user is verified (with expiry from config)"""
+    if not VERIFICATION_ENABLED:
+        logger.info(f"ℹ️ Verification is OFF for user {user_id}")
         return True
     
     user = await db.get_user(user_id)
     
     if not user:
+        logger.info(f"ℹ️ No user found for {user_id}")
         return False
     
-    # Check expiry
-    if user.get("verify_expires"):
-        if datetime.now() > user["verify_expires"]:
-            # Expired - reset
-            await db.update_user(user_id, {"is_verified": False})
+    if not user.get("is_verified", False):
+        logger.info(f"❌ User {user_id} is not verified")
+        return False
+    
+    # Check expiry (from VERIFY_EXPIRE in seconds)
+    verified_at = user.get("verified_at")
+    if verified_at:
+        expire_seconds = VERIFY_EXPIRE
+        if datetime.now() - verified_at > timedelta(seconds=expire_seconds):
+            await db.update_user(user_id, {
+                "is_verified": False,
+                "verified_at": None
+            })
+            logger.info(f"⏰ Verification expired for user {user_id} ({expire_seconds} seconds passed)")
             return False
     
-    return user.get("is_verified", False)
+    logger.info(f"✅ User {user_id} is verified")
+    return True
 
 async def create_verification(user_id: int) -> str:
     """Create new verification for user"""
     verify_id = generate_verify_id()
+    link_expiry_seconds = VERIFY_EXPIRE
     
     await db.update_user(user_id, {
         "verify_id": verify_id,
         "verify_created": datetime.now(),
-        "verify_expires": datetime.now() + timedelta(minutes=10),
-        "is_verified": False
+        "verify_expires": datetime.now() + timedelta(seconds=link_expiry_seconds),
+        "is_verified": False,
+        "verified_at": None
     })
     
+    logger.info(f"🔐 Created verification {verify_id} for user {user_id}")
     return verify_id
 
 async def verify_user(user_id: int, verify_id: str) -> bool:
@@ -121,18 +198,17 @@ async def verify_user(user_id: int, verify_id: str) -> bool:
     if not user:
         return False
     
-    # Check if verify_id matches and not expired
     if user.get("verify_id") == verify_id:
         if datetime.now() < user.get("verify_expires", datetime.now()):
-            # ✅ Verified!
             await db.update_user(user_id, {
                 "is_verified": True,
                 "verified_at": datetime.now()
             })
-            # Remove used verify_id
             await db.update_user(user_id, {"verify_id": None, "verify_expires": None})
+            logger.info(f"✅ User {user_id} verified successfully!")
             return True
     
+    logger.warning(f"❌ Verification failed for user {user_id}")
     return False
 
 async def reset_user_verification(user_id: int):
@@ -140,8 +216,10 @@ async def reset_user_verification(user_id: int):
     await db.update_user(user_id, {
         "is_verified": False,
         "verify_id": None,
-        "verify_expires": None
+        "verify_expires": None,
+        "verified_at": None
     })
+    logger.info(f"🔄 Verification reset for user {user_id}")
 
 # ============ SEND VERIFICATION ALERT ============
 
@@ -150,21 +228,29 @@ async def send_verification_alert(update: Update, context: ContextTypes.DEFAULT_
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or "User"
     
-    # Agar verification OFF hai toh allow karo
-    if not IS_VERIFY:
+    logger.info(f"🔐 Sending verification alert to user {user_id}")
+    
+    if not VERIFICATION_ENABLED:
+        logger.info(f"ℹ️ Verification is OFF, allowing user {user_id}")
         return True
     
-    # Create new verification
-    verify_id = await create_verification(user_id)
+    # Check if already verified and within expiry
+    user = await db.get_user(user_id)
+    if user and user.get("is_verified"):
+        verified_at = user.get("verified_at")
+        if verified_at:
+            expire_seconds = VERIFY_EXPIRE
+            if datetime.now() - verified_at < timedelta(seconds=expire_seconds):
+                logger.info(f"✅ User {user_id} already verified")
+                return True
     
-    # Bot username
+    verify_id = await create_verification(user_id)
     bot_username = (await context.bot.get_me()).username
     
-    # Generate link
     long_url = f"https://t.me/{bot_username}?start=verify_{user_id}_{verify_id}"
-    
-    # Try shortlink
     verify_url = await get_shortlink(long_url)
+    
+    expire_minutes = VERIFY_EXPIRE // 60
     
     text = f"""🔐 <b>Verification Required!</b>
 
@@ -179,7 +265,10 @@ Hello {first_name},
 • 🎯 Better experience
 • ⚡ Faster processing
 
-⏳ Link expires in 10 minutes!"""
+⏳ <b>Verification valid for {expire_minutes} minutes</b>
+After {expire_minutes} minutes, you'll need to verify again.
+
+🔗 Link expires in {expire_minutes} minutes!"""
 
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Verify Now", url=verify_url)],
@@ -188,7 +277,6 @@ Hello {first_name},
     ])
     
     try:
-        # Send with image if available
         if VERIFY_START_IMG:
             await update.message.reply_photo(
                 photo=VERIFY_START_IMG,
@@ -202,9 +290,9 @@ Hello {first_name},
                 reply_markup=buttons,
                 parse_mode="HTML"
             )
+        logger.info(f"✅ Verification alert sent to user {user_id}")
     except Exception as e:
-        logger.error(f"Failed to send verification alert: {e}")
-        # Fallback without image
+        logger.error(f"❌ Failed to send verification alert: {e}")
         await update.message.reply_text(
             text,
             reply_markup=buttons,
@@ -214,9 +302,19 @@ Hello {first_name},
     return False
 
 async def send_verification_success(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Send verification success message"""
+    """Send verification success message with expiry info"""
     user_id = update.effective_user.id
     first_name = update.effective_user.first_name or "User"
+    
+    user = await db.get_user(user_id)
+    verified_at = user.get("verified_at") if user else None
+    
+    expire_minutes = VERIFY_EXPIRE // 60
+    expiry_time = f"{expire_minutes} minutes"
+    
+    if verified_at:
+        expiry = verified_at + timedelta(seconds=VERIFY_EXPIRE)
+        expiry_time = expiry.strftime("%I:%M %p, %d %b %Y")
     
     text = f"""✅ <b>Verification Successful!</b>
 
@@ -226,6 +324,11 @@ You can now:
 📸 Set your thumbnail
 🎬 Apply covers to videos
 📊 Use all bot features
+
+⏳ <b>Verification valid until:</b>
+{expiry_time}
+
+After {expire_minutes} minutes, you'll need to verify again.
 
 Send a photo first to get started!"""
 
@@ -295,16 +398,17 @@ async def toggle_verification(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text("❌ Unauthorized!")
         return
     
-    global IS_VERIFY
-    IS_VERIFY = not IS_VERIFY
+    global VERIFICATION_ENABLED
+    VERIFICATION_ENABLED = not VERIFICATION_ENABLED
     
-    status = "🟢 ON" if IS_VERIFY else "🔴 OFF"
+    status = "🟢 ON" if VERIFICATION_ENABLED else "🔴 OFF"
+    expire_minutes = VERIFY_EXPIRE // 60
     
     text = f"""🎛️ <b>Verification Toggle</b>
 
 📊 Status: {status}
 
-Users will {'need to verify' if IS_VERIFY else 'not need to verify'} before sending videos."""
+Users will {'need to verify every ' + str(expire_minutes) + ' minutes' if VERIFICATION_ENABLED else 'not need to verify'} before sending videos."""
     
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Toggle", callback_data="toggle_verify")],
@@ -327,20 +431,89 @@ async def toggle_shortlink(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Unauthorized!")
         return
     
-    global USE_SHORTLINK
-    USE_SHORTLINK = not USE_SHORTLINK
+    global SHORTLINK_ENABLED
+    SHORTLINK_ENABLED = not SHORTLINK_ENABLED
     
-    status = "🟢 ON" if USE_SHORTLINK else "🔴 OFF"
+    status = "🟢 ON" if SHORTLINK_ENABLED else "🔴 OFF"
     
     text = f"""🔗 <b>Shortlink Toggle</b>
 
 📊 Status: {status}
 
-Verification links will {'use shortlink' if USE_SHORTLINK else 'use direct link'}."""
+Verification links will {'use shortlink' if SHORTLINK_ENABLED else 'use direct link'}."""
     
     buttons = InlineKeyboardMarkup([
         [InlineKeyboardButton("🔄 Toggle", callback_data="toggle_shortlink")],
         [InlineKeyboardButton("⬅️ Back", callback_data="admin_back")]
+    ])
+    
+    await update.message.reply_text(
+        text,
+        reply_markup=buttons,
+        parse_mode="HTML"
+    )
+
+async def get_verified_users_count() -> int:
+    """Get count of verified users"""
+    try:
+        from database import db
+        users = await db.get_all_users()
+        count = 0
+        expire_seconds = VERIFY_EXPIRE
+        for user in users:
+            if user.get("is_verified", False):
+                verified_at = user.get("verified_at")
+                if verified_at:
+                    if datetime.now() - verified_at < timedelta(seconds=expire_seconds):
+                        count += 1
+        return count
+    except Exception as e:
+        logger.error(f"Error counting verified users: {e}")
+        return 0
+
+# ============ CHECK VERIFICATION STATUS COMMAND ============
+
+async def check_verification(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Check user's verification status"""
+    user_id = update.effective_user.id
+    
+    user = await db.get_user(user_id)
+    
+    if not user:
+        text = "❌ No user data found. Please /start the bot."
+        await update.message.reply_text(text, parse_mode="HTML")
+        return
+    
+    is_verified = user.get("is_verified", False)
+    verified_at = user.get("verified_at")
+    expire_minutes = VERIFY_EXPIRE // 60
+    
+    if is_verified and verified_at:
+        if datetime.now() - verified_at < timedelta(seconds=VERIFY_EXPIRE):
+            expiry = verified_at + timedelta(seconds=VERIFY_EXPIRE)
+            text = f"""✅ <b>You are Verified!</b>
+
+⏳ Valid until: {expiry.strftime('%I:%M %p, %d %b %Y')}
+⏰ Valid for: {expire_minutes} minutes
+🔄 Verification expires after {expire_minutes} minutes
+
+You can send videos without any restrictions."""
+        else:
+            text = """⏰ <b>Verification Expired!</b>
+
+Your verification period has ended.
+
+Please verify again to continue using the bot."""
+    else:
+        text = """❌ <b>Not Verified!</b>
+
+You need to verify before sending videos.
+
+Send a video to start verification process."""
+    
+    buttons = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🔄 Verify Now", callback_data="verify_now")],
+        [InlineKeyboardButton("🏠 Home", callback_data="menu_back")]
     ])
     
     await update.message.reply_text(
