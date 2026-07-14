@@ -1336,11 +1336,11 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"Error forwarding video to log channel: {e}")
     except Exception as e:
+        logger.error(f"Video processing error: {e}")
         await update.message.reply_text(
             "❌ Processing failed\n\nError: " + str(e)[:50],
             parse_mode="HTML"
         )
-
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
