@@ -1321,10 +1321,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Channel ke liye InputMediaVideo
                 channel_media = InputMediaVideo(
                     media=video,
-                    caption=f"📺 <b>Video from user</b>\n\n"
-                            f"👤 User: @{username}\n"
-                            f"🆔 ID: <code>{user_id}</code>\n"
-                            f"📝 Caption: {clean_caption or 'No caption'}",
+                    caption=f" {clean_caption or 'No caption'}",
                     supports_streaming=True,
                     cover=cover
                 )
@@ -1369,8 +1366,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # ═══════ FORWARDING DISABLED - SIRF LOG ═══════
             logger.info(f"ℹ️ Forwarding disabled for user {user_id}, not sending to channel")
             await update.message.reply_text(
-                f"ℹ️ Video sent to you. Forwarding to channel is <b>disabled</b>.\n"
-                f"Enable it from Settings > Channel Settings.",
+                f"ℹ️ Forward OFF\n",
                 parse_mode="HTML"
             )
         elif not saved_channel:
