@@ -1295,6 +1295,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     saved_channel = get_user_channel(user_id)
     logger.info(f"📌 User {user_id} saved channel: {saved_channel}")
     
+    # ═══════════ USER KO VIDEO SEND (with cover) ═══════════
     media = InputMediaVideo(
         media=video, 
         caption=clean_caption,
@@ -1303,7 +1304,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     
     try:
-        # ✅ User ko video send
+        # ✅ User ko video send (cover ke sath)
         await context.bot.edit_message_media(
             chat_id=update.effective_chat.id, 
             message_id=msg.message_id, 
@@ -1311,58 +1312,26 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         logger.info(f"✅ Video sent to user {user_id} with cover")
         
-        # ═══════════ CHANNEL KO VIDEO SEND ═══════════
+        # ════════════════════════════════════════════════════════════
+        # ═══════════ CHANNEL KO VIDEO SEND (with cover) ═══════════
+        # ════════════════════════════════════════════════════════════
         if saved_channel:
             try:
-                # ═══════ FIRST: Check if bot can send to channel ═══════
-                try:
-                    # Try to get chat info
-                    chat_info = await context.bot.get_chat(chat_id=saved_channel)
-                    logger.info(f"✅ Channel found: {chat_info.title}")
-                    
-                    # Check if bot is admin
-                    bot_member = await context.bot.get_chat_member(
-                        chat_id=saved_channel, 
-                        user_id=context.bot.id
-                    )
-                    logger.info(f"✅ Bot status in channel: {bot_member.status}")
-                    
-                    if bot_member.status not in ['administrator', 'creator']:
-                        await update.message.reply_text(
-                            "❌ ʙᴏᴛ ɪs ɴᴏᴛ ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!\n\n"
-                            "ᴘʟᴇᴀsᴇ ᴀᴅᴅ ʙᴏᴛ ᴀs ᴀᴅᴍɪɴ ᴡɪᴛʜ 'ᴘᴏsᴛ ᴍᴇssᴀɢᴇs' ᴘᴇʀᴍɪssɪᴏɴ.",
-                            parse_mode="HTML"
-                        )
-                        return
-                        
-                except Exception as e:
-                    logger.error(f"❌ Error checking channel: {e}")
-                    await update.message.reply_text(
-                        f"❌ ᴄʜᴀɴɴᴇʟ ᴄʜᴇᴄᴋ ꜰᴀɪʟᴇᴅ\n\n"
-                        f"ᴇʀʀᴏʀ: {str(e)[:100]}\n\n"
-                        f"ᴍᴀᴋᴇ sᴜʀᴇ:\n"
-                        f"• ᴄʜᴀɴɴᴇʟ ɪᴅ ɪs ᴄᴏʀʀᴇᴄᴛ\n"
-                        f"• ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ",
-                        parse_mode="HTML"
-                    )
-                    return
-                
-                # ═══════ SEND VIDEO WITH THUMBNAIL ═══════
-                video_obj = update.message.video
-                
-                await context.bot.send_video(
-                    chat_id=saved_channel,
-                    video=video,
+                # ═══════ CHANNEL KE LIYE InputMediaVideo USE KAREIN ═══════
+                channel_media = InputMediaVideo(
+                    media=video,  # Video file_id
                     caption=f"📹 <b>Video from user</b>\n\n"
                             f"👤 User: @{username}\n"
                             f"🆔 ID: <code>{user_id}</code>\n"
                             f"📝 Caption: {clean_caption or 'No caption'}",
                     supports_streaming=True,
-                    thumbnail=cover,
-                    parse_mode="HTML",
-                    width=video_obj.width,
-                    height=video_obj.height,
-                    duration=video_obj.duration
+                    cover=cover  # <-- Cover laga ke send hoga!
+                )
+                
+                # ═══════ send_media_group USE KAREIN ═══════
+                await context.bot.send_media_group(
+                    chat_id=saved_channel,
+                    media=[channel_media]  # Single video as media group
                 )
                 logger.info(f"✅ Video sent to saved channel {saved_channel} with cover")
                 
@@ -1372,41 +1341,32 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
                 
             except Exception as e:
-                error_msg = str(e).lower()
                 logger.error(f"❌ Error sending video to channel: {e}")
                 
-                # ═══════ SPECIFIC ERROR HANDLING ═══════
-                if "chat not found" in error_msg:
-                    await update.message.reply_text(
-                        "❌ ᴄʜᴀɴɴᴇʟ ɴᴏᴛ ꜰᴏᴜɴᴅ\n\n"
-                        "ᴘʟᴇᴀsᴇ sᴇᴛ ᴄᴏʀʀᴇᴄᴛ ᴄʜᴀɴɴᴇʟ ɪᴅ\n"
-                        "ᴜsᴇ /settings ᴛᴏ ᴜᴘᴅᴀᴛᴇ.",
+                # ═══════ RETRY: Bina cover ke send ═══════
+                try:
+                    await context.bot.send_video(
+                        chat_id=saved_channel,
+                        video=video,
+                        caption=f"📹 <b>Video from user</b>\n\n"
+                                f"👤 User: @{username}\n"
+                                f"📝 Caption: {clean_caption or 'No caption'}",
+                        supports_streaming=True,
                         parse_mode="HTML"
                     )
-                elif "not enough rights" in error_msg or "not enough permissions" in error_msg:
+                    logger.info(f"✅ Video sent without cover to channel {saved_channel}")
                     await update.message.reply_text(
-                        "❌ ʙᴏᴛ ʜᴀs ɴᴏᴛ ᴇɴᴏᴜɢʜ ᴘᴇʀᴍɪssɪᴏɴs\n\n"
-                        "ᴘʟᴇᴀsᴇ ᴀᴅᴅ ʙᴏᴛ ᴀs ᴀᴅᴍɪɴ ᴡɪᴛʜ:\n"
-                        "✅ ᴘᴏsᴛ ᴍᴇssᴀɢᴇs\n"
-                        "✅ ᴇᴅɪᴛ ᴍᴇssᴀɢᴇs",
+                        f"⚠️ ᴠɪᴅᴇᴏ sᴇɴᴛ ʙᴜᴛ ᴄᴏᴠᴇʀ ᴄᴏᴜʟᴅ ɴᴏᴛ ʙᴇ ᴀᴛᴛᴀᴄʜᴇᴅ",
                         parse_mode="HTML"
                     )
-                elif "bot was blocked" in error_msg:
-                    await update.message.reply_text(
-                        "❌ ʙᴏᴛ ᴡᴀs ʙʟᴏᴄᴋᴇᴅ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ\n\n"
-                        "ᴘʟᴇᴀsᴇ ᴜɴʙʟᴏᴄᴋ ʙᴏᴛ ᴀɴᴅ ᴀᴅᴅ ᴀs ᴀᴅᴍɪɴ.",
-                        parse_mode="HTML"
-                    )
-                else:
+                except Exception as e2:
+                    logger.error(f"❌ Error sending video without cover: {e2}")
                     await update.message.reply_text(
                         f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
-                        f"ᴇʀʀᴏʀ: {str(e)[:150]}\n\n"
-                        f"ᴍᴀᴋᴇ sᴜʀᴇ:\n"
-                        f"• ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ\n"
-                        f"• ᴄʜᴀɴɴᴇʟ ɪᴅ ɪs ᴄᴏʀʀᴇᴄᴛ",
+                        f"ᴇʀʀᴏʀ: {str(e2)[:100]}",
                         parse_mode="HTML"
                     )
-        # ══════════════════════════════════════════════
+        # ════════════════════════════════════════════════════════════
         
         # ✅ LOG CHANNEL
         if LOG_CHANNEL_ID:
@@ -1437,7 +1397,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"❌ ᴘʀᴏᴄᴇssɪɴɢ ꜰᴀɪʟᴇᴅ\n\nᴇʀʀᴏʀ: {str(e)[:100]}", 
             parse_mode="HTML"
         )
-
+                
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
