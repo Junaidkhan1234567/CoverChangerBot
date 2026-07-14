@@ -3,7 +3,7 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
-from database import db  # <-- MongoDB database import
+from database import db
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,10 @@ def get_forward_enabled(user_id: int) -> bool:
     except Exception as e:
         logger.error(f"Error getting forward enabled status: {e}")
         return True
+
+def should_forward_to_channel(user_id: int) -> bool:
+    """Alias for get_forward_enabled - checks if forwarding is enabled"""
+    return get_forward_enabled(user_id)
 
 def save_user_channel(user_id: int, channel_id: str) -> None:
     """Save user's channel ID to database"""
@@ -66,6 +70,36 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
         logger.info(f"✅ Forward enabled status saved for user {user_id}: {enabled}")
     except Exception as e:
         logger.error(f"Error saving forward enabled status: {e}")
+
+# ═══════════════════ SEND TO CHANNEL HELPER ═══════════════════
+async def send_to_channel_if_enabled(context, user_id: int, video_file, caption: str = "", **kwargs):
+    """
+    Send video to user's channel only if forwarding is enabled.
+    Returns: (sent: bool, channel_id: str or None)
+    """
+    channel_id = get_user_channel(user_id)
+    forward_enabled = should_forward_to_channel(user_id)
+    
+    if not channel_id:
+        logger.info(f"ℹ️ No channel set for user {user_id}")
+        return False, None
+    
+    if not forward_enabled:
+        logger.info(f"ℹ️ Forwarding disabled for user {user_id}, not sending to channel")
+        return False, channel_id
+    
+    try:
+        await context.bot.send_video(
+            chat_id=channel_id,
+            video=video_file,
+            caption=caption,
+            **kwargs
+        )
+        logger.info(f"✅ Video forwarded to channel {channel_id} for user {user_id}")
+        return True, channel_id
+    except Exception as e:
+        logger.error(f"❌ Failed to forward to channel {channel_id}: {e}")
+        return False, channel_id
 
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -213,7 +247,8 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = (
             "🗑️ <b>Channel Removed</b>\n\n"
             f"Removed: <code>{current_channel}</code>\n\n"
-            "You can set a new channel anytime."
+            "You can set a new channel anytime.\n"
+            "Forwarding has been reset to enabled by default."
         )
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📝 Set New Channel", callback_data="channel_set")],
