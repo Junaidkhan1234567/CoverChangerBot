@@ -1682,6 +1682,8 @@ def main() -> None:
     # ✅ POST_INIT - Deploy log ke liye
     app.post_init = post_init
 
+    register_channel_handlers(app)
+
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("about", about, filters=filters.ChatType.PRIVATE))
