@@ -1,8 +1,3 @@
-"""
-MongoDB Database Module for Video Cover Bot
-Handles all database operations for user thumbnails
-"""
-
 import os
 import logging
 from datetime import datetime
@@ -313,3 +308,57 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
     logger.info(f"✅ {action} - {username} ({user_id})")
     return create_log_entry(user_id, username, action)
 
+# ============ VERIFICATION DATABASE FUNCTIONS ============
+# Add these functions to your existing database.py
+
+async def get_user(user_id: int) -> dict:
+    """Get user data"""
+    if not DB_AVAILABLE:
+        return None
+    
+    try:
+        user = users_collection.find_one({"user_id": user_id})
+        return user
+    except Exception as e:
+        logger.error(f"Error getting user: {e}")
+        return None
+
+async def update_user(user_id: int, data: dict) -> bool:
+    """Update user data"""
+    if not DB_AVAILABLE:
+        return False
+    
+    try:
+        users_collection.update_one(
+            {"user_id": user_id},
+            {"$set": data},
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        logger.error(f"Error updating user: {e}")
+        return False
+
+async def get_all_users() -> list:
+    """Get all users"""
+    if not DB_AVAILABLE:
+        return []
+    
+    try:
+        users = users_collection.find({})
+        return list(users)
+    except Exception as e:
+        logger.error(f"Error getting users: {e}")
+        return []
+
+async def get_verified_users_count() -> int:
+    """Get count of verified users"""
+    if not DB_AVAILABLE:
+        return 0
+    
+    try:
+        count = users_collection.count_documents({"is_verified": True})
+        return count
+    except Exception as e:
+        logger.error(f"Error counting verified users: {e}")
+        return 0
