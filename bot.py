@@ -1260,7 +1260,6 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     action_text = "ᴜᴘᴅᴀᴛᴇᴅ" if is_replace else "sᴀᴠᴇᴅ"
     await update.message.reply_text("✅ ᴛʜᴜᴍʙɴᴀɪʟ " + action_text + "\n\nʀᴇᴀᴅʏ! sᴇɴᴅ ᴀɴʏ ᴠɪᴅᴇᴏ ᴛᴏ ᴀᴘᴘʟʏ ᴄᴏᴠᴇʀ", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
-
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1296,7 +1295,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     saved_channel = get_user_channel(user_id)
     logger.info(f"📌 User {user_id} saved channel: {saved_channel}")
     
-    # ═══════════ USER KO VIDEO SEND ═══════════
     media = InputMediaVideo(
         media=video, 
         caption=clean_caption,
@@ -1316,47 +1314,98 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # ═══════════ CHANNEL KO VIDEO SEND ═══════════
         if saved_channel:
             try:
-                # ═══════ Download video ═══════
-                video_file = await context.bot.get_file(video)
-                video_path = f"temp_video_{user_id}.mp4"
-                await video_file.download_to_drive(video_path)
-                
-                # ═══════ Download thumbnail ═══════
-                thumb_file = await context.bot.get_file(cover)
-                thumb_path = f"temp_thumb_{user_id}.jpg"
-                await thumb_file.download_to_drive(thumb_path)
-                
-                # ═══════ Send video with thumbnail ═══════
-                with open(video_path, 'rb') as v:
-                    with open(thumb_path, 'rb') as t:
-                        await context.bot.send_video(
-                            chat_id=saved_channel,
-                            video=InputFile(v),
-                            caption=f"📹 <b>Video from user</b>\n\n"
-                                    f"👤 User: @{username}\n"
-                                    f"📝 Caption: {clean_caption or 'No caption'}",
-                            supports_streaming=True,
-                            thumbnail=InputFile(t),
+                # ═══════ FIRST: Check if bot can send to channel ═══════
+                try:
+                    # Try to get chat info
+                    chat_info = await context.bot.get_chat(chat_id=saved_channel)
+                    logger.info(f"✅ Channel found: {chat_info.title}")
+                    
+                    # Check if bot is admin
+                    bot_member = await context.bot.get_chat_member(
+                        chat_id=saved_channel, 
+                        user_id=context.bot.id
+                    )
+                    logger.info(f"✅ Bot status in channel: {bot_member.status}")
+                    
+                    if bot_member.status not in ['administrator', 'creator']:
+                        await update.message.reply_text(
+                            "❌ ʙᴏᴛ ɪs ɴᴏᴛ ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!\n\n"
+                            "ᴘʟᴇᴀsᴇ ᴀᴅᴅ ʙᴏᴛ ᴀs ᴀᴅᴍɪɴ ᴡɪᴛʜ 'ᴘᴏsᴛ ᴍᴇssᴀɢᴇs' ᴘᴇʀᴍɪssɪᴏɴ.",
                             parse_mode="HTML"
                         )
+                        return
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error checking channel: {e}")
+                    await update.message.reply_text(
+                        f"❌ ᴄʜᴀɴɴᴇʟ ᴄʜᴇᴄᴋ ꜰᴀɪʟᴇᴅ\n\n"
+                        f"ᴇʀʀᴏʀ: {str(e)[:100]}\n\n"
+                        f"ᴍᴀᴋᴇ sᴜʀᴇ:\n"
+                        f"• ᴄʜᴀɴɴᴇʟ ɪᴅ ɪs ᴄᴏʀʀᴇᴄᴛ\n"
+                        f"• ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ",
+                        parse_mode="HTML"
+                    )
+                    return
                 
-                # ═══════ Cleanup ═══════
-                os.remove(video_path)
-                os.remove(thumb_path)
+                # ═══════ SEND VIDEO WITH THUMBNAIL ═══════
+                video_obj = update.message.video
                 
-                logger.info(f"✅ Video sent to channel {saved_channel} with cover")
+                await context.bot.send_video(
+                    chat_id=saved_channel,
+                    video=video,
+                    caption=f"📹 <b>Video from user</b>\n\n"
+                            f"👤 User: @{username}\n"
+                            f"🆔 ID: <code>{user_id}</code>\n"
+                            f"📝 Caption: {clean_caption or 'No caption'}",
+                    supports_streaming=True,
+                    thumbnail=cover,
+                    parse_mode="HTML",
+                    width=video_obj.width,
+                    height=video_obj.height,
+                    duration=video_obj.duration
+                )
+                logger.info(f"✅ Video sent to saved channel {saved_channel} with cover")
+                
                 await update.message.reply_text(
                     f"✅ ᴠɪᴅᴇᴏ sᴇɴᴛ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴡɪᴛʜ ᴄᴏᴠᴇʀ!",
                     parse_mode="HTML"
                 )
                 
             except Exception as e:
+                error_msg = str(e).lower()
                 logger.error(f"❌ Error sending video to channel: {e}")
-                await update.message.reply_text(
-                    f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
-                    f"ᴍᴀᴋᴇ sᴜʀᴇ ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!",
-                    parse_mode="HTML"
-                )
+                
+                # ═══════ SPECIFIC ERROR HANDLING ═══════
+                if "chat not found" in error_msg:
+                    await update.message.reply_text(
+                        "❌ ᴄʜᴀɴɴᴇʟ ɴᴏᴛ ꜰᴏᴜɴᴅ\n\n"
+                        "ᴘʟᴇᴀsᴇ sᴇᴛ ᴄᴏʀʀᴇᴄᴛ ᴄʜᴀɴɴᴇʟ ɪᴅ\n"
+                        "ᴜsᴇ /settings ᴛᴏ ᴜᴘᴅᴀᴛᴇ.",
+                        parse_mode="HTML"
+                    )
+                elif "not enough rights" in error_msg or "not enough permissions" in error_msg:
+                    await update.message.reply_text(
+                        "❌ ʙᴏᴛ ʜᴀs ɴᴏᴛ ᴇɴᴏᴜɢʜ ᴘᴇʀᴍɪssɪᴏɴs\n\n"
+                        "ᴘʟᴇᴀsᴇ ᴀᴅᴅ ʙᴏᴛ ᴀs ᴀᴅᴍɪɴ ᴡɪᴛʜ:\n"
+                        "✅ ᴘᴏsᴛ ᴍᴇssᴀɢᴇs\n"
+                        "✅ ᴇᴅɪᴛ ᴍᴇssᴀɢᴇs",
+                        parse_mode="HTML"
+                    )
+                elif "bot was blocked" in error_msg:
+                    await update.message.reply_text(
+                        "❌ ʙᴏᴛ ᴡᴀs ʙʟᴏᴄᴋᴇᴅ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ\n\n"
+                        "ᴘʟᴇᴀsᴇ ᴜɴʙʟᴏᴄᴋ ʙᴏᴛ ᴀɴᴅ ᴀᴅᴅ ᴀs ᴀᴅᴍɪɴ.",
+                        parse_mode="HTML"
+                    )
+                else:
+                    await update.message.reply_text(
+                        f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
+                        f"ᴇʀʀᴏʀ: {str(e)[:150]}\n\n"
+                        f"ᴍᴀᴋᴇ sᴜʀᴇ:\n"
+                        f"• ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ\n"
+                        f"• ᴄʜᴀɴɴᴇʟ ɪᴅ ɪs ᴄᴏʀʀᴇᴄᴛ",
+                        parse_mode="HTML"
+                    )
         # ══════════════════════════════════════════════
         
         # ✅ LOG CHANNEL
