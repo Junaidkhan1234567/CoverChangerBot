@@ -41,9 +41,81 @@ UPSTREAM_REPO=https://github.com/your_username/your_repo
 UPSTREAM_BRANCH=main
 
 # ═══════════════════════════════════════════════════════════
+# 🔐 VERIFICATION SYSTEM - COMPLETE TOGGLES
+# ═══════════════════════════════════════════════════════════
+
+# ─── VERIFICATION MAIN TOGGLE ───
+# True = Verification ON (Users need to verify)
+# False = Verification OFF (Users can send videos directly without verification)
+VERIFICATION_ENABLED=True
+
+# ─── VERIFICATION IMAGES ───
+# Image shown when verification is required (alert message)
+VERIFY_START_IMG=https://example.com/verify-start.jpg
+
+# Image shown when verification is successful
+VERIFY_COMPLETE_IMG=https://example.com/verify-complete.jpg
+
+# ─── TUTORIAL LINK ───
+# Tutorial link showing how to verify
+TUTORIAL_LINK=https://t.me/your_channel/verify_tutorial
+
+# ─── VERIFICATION LOG CHANNEL ───
+# Channel ID where verification logs will be sent
+VERIFIED_LOG=-1002659719637
+
+# ─── TIMEZONE ───
+# Your timezone (for timestamp in logs)
+TIMEZONE=Asia/Kolkata
+
+# ═══════════════════════════════════════════════════════════
+# 🔗 SHORTLINK SYSTEM - GP LINKS / CUSTOM API
+# ═══════════════════════════════════════════════════════════
+
+# ─── SHORTLINK MAIN TOGGLE ───
+# True = Use shortlink for verification links
+# False = Use direct Telegram link
+SHORTLINK_ENABLED=True
+
+# ─── SHORTLINK URL (API Endpoint) ───
+# Your shortlink service URL (Example: gplinks.com, shorte.st, etc.)
+# Note: Don't add https://, just the domain
+SHORTLINK_URL=gplinks.com
+
+# ─── SHORTLINK API KEY ───
+# Your shortlink API key from the service
+SHORTLINK_API=05f3a1bccfa105188a114bf16d09e6c3b5cb2902
+
+# ═══════════════════════════════════════════════════════════
+# 📤 POST SHORTLINK SYSTEM (For File Sharing/Posts)
+# ═══════════════════════════════════════════════════════════
+
+# ─── POST SHORTLINK TOGGLE ───
+# True = Use shortlink for posts/file sharing
+# False = Use direct link
+POST_SHORTLINK_ENABLED=True
+
+# ─── POST SHORTLINK URL ───
+# Your post shortlink service URL
+# Note: Don't add https://, just the domain
+POST_SHORTLINK_URL=gplinks.com
+
+# ─── POST SHORTLINK API KEY ───
+# Your post shortlink API key
+POST_SHORTLINK_API=05f3a1bccfa105188a114bf16d09e6c3b5cb2902
+
+# ═══════════════════════════════════════════════════════════
+# ⏰ VERIFICATION EXPIRY SETTINGS
+# ═══════════════════════════════════════════════════════════
+
+# ─── VERIFICATION LINK EXPIRY (in seconds) ───
+# How many seconds the verification link is valid for
+# Default: 3600 seconds = 1 hour
+VERIFY_EXPIRE=3600
+
+# ═══════════════════════════════════════════════════════════
 # SETUP INSTRUCTIONS:
 # 1. Copy this file to config.env
 # 2. Fill in all the values above
 # 3. Run: python bot.py
 # ═══════════════════════════════════════════════════════════
-
