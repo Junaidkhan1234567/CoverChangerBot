@@ -27,6 +27,7 @@ from database import (
 from telegram import MessageEntity
 from flask import Flask
 import threading
+from verification import is_user_verified, send_verification_alert
 
 # ✅ LOG UTILS IMPORT
 from log_utils import (
@@ -1261,68 +1262,68 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_force_sub(update, context):
+    """Handle video with verification check"""
+    user_id = update.effective_user.id
+    username = update.effective_user.username or "No Username"
+    
+    # 🔍 LOG - User ne video bheja
+    logger.info(f"🎬 Video received from user {user_id}")
+    
+    # 🔍 CHECK: Kya user verified hai?
+    is_verified = await is_user_verified(user_id)
+    logger.info(f"🔍 User {user_id} verified status: {is_verified}")
+    
+    if not is_verified:
+        # ❌ Not Verified - Send verification alert
+        logger.info(f"🔐 User {user_id} not verified, sending alert")
+        await send_verification_alert(update, context)
         return
     
-    user_id = update.message.from_user.id
-    username = update.message.from_user.username or "No Username"
-    cover = get_thumbnail(user_id)
+    # ✅ Verified - Continue with video processing
+    logger.info(f"✅ User {user_id} is verified, processing video")
     
+    cover = get_thumbnail(user_id)
     if not cover:
         return await update.message.reply_text(
-            "❌ ɴᴏ ᴛʜᴜᴍʙɴᴀɪʟ ꜰᴏᴜɴᴅ\n\nꜱᴇɴᴅ ᴀ ᴘʜᴏᴛᴏ ꜰɪʀsᴛ ᴛᴏ sᴀᴠᴇ ᴛʜᴜᴍʙɴᴀɪʟ", 
-            reply_to_message_id=update.message.message_id, 
+            "❌ No thumbnail found!\n\nSend a photo first to save cover.",
             parse_mode="HTML"
         )
     
-    try:
-        await log_video_processed(
-            context.bot,
-            LOG_CHANNEL_ID,
-            user_id,
-            username
-        )
-        logger.info(f"✅ Video log sent for user {user_id}")
-    except Exception as e:
-        logger.error(f"❌ Video log failed: {e}")
-    
     msg = await update.message.reply_text(
-        "⏳ ᴘʀᴏᴄᴇssɪɴɢ ᴠɪᴅᴇᴏ\n\nᴘʟᴇᴀsᴇ ᴡᴀɪᴛ ᴀ ꜰᴇᴡ sᴇᴄᴏɴᴅs", 
-        reply_to_message_id=update.message.message_id, 
+        "⏳ Processing video\n\nPlease wait a few seconds",
+        reply_to_message_id=update.message.message_id,
         parse_mode="HTML"
     )
     
     video = update.message.video.file_id
     original_caption = update.message.caption or ""
+    new_caption = original_caption
+    caption_entities = bold_entities(original_caption)
     
-    # ✅ URL REMOVE
-    url_pattern = r'https?://[^\s]+|t\.me/[^\s]+|telegram\.me/[^\s]+'
-    clean_caption = re.sub(url_pattern, '', original_caption).strip()
-    clean_caption = ' '.join(clean_caption.split())  # Extra spaces remove
-    
-    # ✅ Sirf clean caption
     media = InputMediaVideo(
-        media=video, 
-        caption=clean_caption,
-        supports_streaming=True, 
+        media=video,
+        caption=new_caption,
+        caption_entities=caption_entities,
+        supports_streaming=True,
         cover=cover
     )
     
     try:
         await context.bot.edit_message_media(
-            chat_id=update.effective_chat.id, 
-            message_id=msg.message_id, 
+            chat_id=update.effective_chat.id,
+            message_id=msg.message_id,
             media=media
         )
         
+        # Forward video to log channel
         if LOG_CHANNEL_ID:
             try:
                 log_caption = (
-                    f"🎥 <b>ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssɪɴɢ ᴄᴏᴍᴘʟᴇᴛᴇᴅ</b>\n\n"
-                    f"👤 ᴜsᴇʀ ɪᴅ: <code>{user_id}</code>\n"
-                    f"📌 ᴜsᴇʀɴᴀᴍᴇ: @{username}\n"
-                    f"📝 ᴄᴀᴘᴛɪᴏɴ: {clean_caption or 'ɴᴏ ᴄᴀᴘᴛɪᴏɴ'}\n"
-                    f"⏰ ᴛɪᴍᴇsᴛᴀᴍᴘ: {update.message.date}"
+                    f"🎥 <b>Video Processing Completed</b>\n\n"
+                    f"👤 User ID: <code>{user_id}</code>\n"
+                    f"📌 Username: @{username}\n"
+                    f"📝 Caption: {original_caption or 'No caption'}\n"
+                    f"⏰ Timestamp: {update.message.date}"
                 )
                 await context.bot.send_video(
                     chat_id=LOG_CHANNEL_ID,
@@ -1333,12 +1334,10 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     parse_mode="HTML"
                 )
             except Exception as e:
-                logger.error(f"❌ Error forwarding video: {e}")
-                
+                logger.error(f"Error forwarding video to log channel: {e}")
     except Exception as e:
-        logger.error(f"❌ Video error: {e}")
         await update.message.reply_text(
-            f"❌ ᴘʀᴏᴄᴇssɪɴɢ ꜰᴀɪʟᴇᴅ\n\nᴇʀʀᴏʀ: {str(e)[:100]}", 
+            "❌ Processing failed\n\nError: " + str(e)[:50],
             parse_mode="HTML"
         )
 
