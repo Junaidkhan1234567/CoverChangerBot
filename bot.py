@@ -1320,10 +1320,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await context.bot.send_video(
                     chat_id=saved_channel,
                     video=video,
-                    caption=f"📹 <b>Video from user</b>\n\n"
-                            f"👤 User: @{username}\n"
-                            f"🆔 ID: <code>{user_id}</code>\n"
-                            f"📝 Caption: {clean_caption or 'No caption'}",
+                    caption=f" {clean_caption or 'No caption'}",
                     supports_streaming=True,
                     thumbnail=cover,
                     parse_mode="HTML"
