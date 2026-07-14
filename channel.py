@@ -1,7 +1,8 @@
 # channel.py
 import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import ContextTypes
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
+from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram.error import BadRequest
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,11 @@ def save_user_channel(user_id: int, channel_id: str) -> None:
     """Save user's channel ID"""
     if not hasattr(save_user_channel, 'channels'):
         save_user_channel.channels = {}
-    save_user_channel.channels[str(user_id)] = channel_id
+    if channel_id is None:
+        if str(user_id) in save_user_channel.channels:
+            del save_user_channel.channels[str(user_id)]
+    else:
+        save_user_channel.channels[str(user_id)] = channel_id
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show channel settings menu"""
@@ -51,7 +56,7 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     
     try:
         msg = query.message
-        if getattr(msg, "photo", None):
+        if hasattr(msg, "photo") and msg.photo:
             await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
         else:
             await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
@@ -71,7 +76,8 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "1️⃣ Forward any message from your channel to @getidsbot\n"
         "2️⃣ Copy the ID (starts with -100)\n\n"
         "Example: <code>-1001234567890</code>\n\n"
-        "⚠️ Make sure the bot is an admin in that channel!"
+        "⚠️ Make sure the bot is an admin in that channel!\n\n"
+        "To cancel, send /cancel"
     )
     
     keyboard = InlineKeyboardMarkup([
@@ -83,7 +89,7 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         msg = query.message
-        if getattr(msg, "photo", None):
+        if hasattr(msg, "photo") and msg.photo:
             await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
         else:
             await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
@@ -118,7 +124,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         msg = query.message
-        if getattr(msg, "photo", None):
+        if hasattr(msg, "photo") and msg.photo:
             await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
         else:
             await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
@@ -143,14 +149,13 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             "To get your channel ID:\n"
             "1️⃣ Forward any message from your channel to @getidsbot\n"
             "2️⃣ Copy the ID starting with -100\n\n"
-            "Try again or click /cancel to exit.",
+            "Try again or send /cancel to exit.",
             parse_mode="HTML"
         )
         return True
     
     try:
         # Try to verify if bot can access the channel
-        from telegram.error import BadRequest
         try:
             chat = await context.bot.get_chat(chat_id=channel_id)
             channel_name = chat.title or "Unknown Channel"
@@ -182,14 +187,15 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                     "• The channel ID is correct\n"
                     "• The bot is an admin in the channel\n"
                     "• The channel exists\n\n"
-                    "Try again or click /cancel to exit.",
+                    "Try again or send /cancel to exit.",
                     parse_mode="HTML"
                 )
             else:
                 await update.message.reply_text(
                     f"❌ <b>Error</b>\n\n"
                     f"Could not verify channel: {str(e)[:100]}\n\n"
-                    "Make sure the bot is an admin in the channel.",
+                    "Make sure the bot is an admin in the channel.\n"
+                    "Try again or send /cancel to exit.",
                     parse_mode="HTML"
                 )
             return True
@@ -199,7 +205,68 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(
             f"❌ <b>Error</b>\n\n"
             f"Could not verify channel. Error: {str(e)[:100]}\n\n"
-            "Please try again.",
+            "Please try again or send /cancel to exit.",
             parse_mode="HTML"
         )
         return True
+
+async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Cancel channel setup process"""
+    user_id = update.message.from_user.id
+    
+    if context.user_data.get('awaiting_channel_id', False):
+        context.user_data['awaiting_channel_id'] = False
+        await update.message.reply_text(
+            "❌ <b>Channel Setup Cancelled</b>\n\n"
+            "You can start again anytime from Settings.",
+            parse_mode="HTML"
+        )
+        logger.info(f"User {user_id} cancelled channel setup")
+    else:
+        await update.message.reply_text(
+            "ℹ️ No ongoing channel setup to cancel.",
+            parse_mode="HTML"
+        )
+
+# ============== HANDLER REGISTRATION FUNCTION ==============
+
+def register_channel_handlers(app):
+    """
+    Register all channel-related handlers with the bot application.
+    This function should be called from main.py or bot.py
+    """
+    
+    # Callback query handlers
+    app.add_handler(CallbackQueryHandler(show_channel_settings, pattern="^channel_settings$"))
+    app.add_handler(CallbackQueryHandler(channel_set_prompt, pattern="^channel_set$"))
+    app.add_handler(CallbackQueryHandler(channel_remove, pattern="^channel_remove$"))
+    
+    # Command handler for cancel
+    app.add_handler(CommandHandler("cancel", cancel_channel_setup))
+    
+    # Message handler for channel ID input - this will check if user is in channel setup mode
+    # Add this handler with low priority so it doesn't conflict with other handlers
+    app.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND, 
+        handle_channel_id_input
+    ), group=10)  # Lower priority group
+    
+    logger.info("✅ Channel handlers registered successfully")
+    
+    return app
+
+# ============== COMPATIBILITY FUNCTIONS ==============
+
+# These functions are for backward compatibility with bot.py imports
+async def channel_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Legacy callback handler - kept for compatibility"""
+    query = update.callback_query
+    if not query or not query.data:
+        return
+    
+    if query.data == "channel_settings":
+        await show_channel_settings(update, context)
+    elif query.data == "channel_set":
+        await channel_set_prompt(update, context)
+    elif query.data == "channel_remove":
+        await channel_remove(update, context)
