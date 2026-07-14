@@ -21,8 +21,8 @@ IS_VERIFY = os.environ.get("IS_VERIFY", "True").lower() == "true"
 USE_SHORTLINK = os.environ.get("USE_SHORTLINK", "True").lower() == "true"
 
 # Shortlink API
-SHORTLINK_API = os.environ.get("SHORTLINK_API", "")
-SHORTLINK_API_KEY = os.environ.get("SHORTLINK_API_KEY", "")
+SHORTLINK_API = os.environ.get("SHORTLINK_API", "gplinks.com")
+SHORTLINK_API_KEY = os.environ.get("SHORTLINK_API_KEY", "05f3a1bccfa105188a114bf16d09e6c3b5cb2902")
 
 # Images
 VERIFY_START_IMG = os.environ.get("VERIFY_START_IMG", "")
