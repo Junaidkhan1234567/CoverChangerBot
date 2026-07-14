@@ -1288,27 +1288,24 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     video = update.message.video.file_id
     original_caption = update.message.caption or ""
     
-    # ✅ URL REMOVE
     url_pattern = r'https?://[^\s]+|t\.me/[^\s]+|telegram\.me/[^\s]+'
     clean_caption = re.sub(url_pattern, '', original_caption).strip()
     clean_caption = ' '.join(clean_caption.split())
     
-    # ═══════════ GET SAVED CHANNEL ═══════════
     from channel import get_user_channel
     saved_channel = get_user_channel(user_id)
     logger.info(f"📌 User {user_id} saved channel: {saved_channel}")
-    # ════════════════════════════════════════
     
-    # ═══════════ USER KO VIDEO SEND (with cover) ═══════════
+    # ═══════════ USER KO VIDEO SEND ═══════════
     media = InputMediaVideo(
         media=video, 
         caption=clean_caption,
         supports_streaming=True, 
-        cover=cover  # <-- User ke liye cover laga ke send
+        cover=cover
     )
     
     try:
-        # ✅ USER KO VIDEO SEND (cover ke sath)
+        # ✅ User ko video send
         await context.bot.edit_message_media(
             chat_id=update.effective_chat.id, 
             message_id=msg.message_id, 
@@ -1316,26 +1313,38 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         logger.info(f"✅ Video sent to user {user_id} with cover")
         
-        # ═══════════ CHANNEL KO VIDEO SEND (cover ke sath) ═══════════
+        # ═══════════ CHANNEL KO VIDEO SEND ═══════════
         if saved_channel:
             try:
-                # ✅ CHANNEL KO BHI WAISE HI VIDEO SEND (cover ke sath)
-                await context.bot.send_video(
-                    chat_id=saved_channel,
-                    video=video,
-                    caption=f"📹 <b>Video from user</b>\n\n"
-                            f"👤 User: @{username}\n"
-                            f"🆔 ID: <code>{user_id}</code>\n"
-                            f"📝 Caption: {clean_caption or 'No caption'}",
-                    supports_streaming=True,
-                    thumbnail=cover,  # <-- Channel ke liye bhi cover laga ke send
-                    parse_mode="HTML",
-                    width=update.message.video.width,
-                    height=update.message.video.height,
-                    duration=update.message.video.duration
-                )
-                logger.info(f"✅ Video sent to saved channel {saved_channel} with cover")
+                # ═══════ Download video ═══════
+                video_file = await context.bot.get_file(video)
+                video_path = f"temp_video_{user_id}.mp4"
+                await video_file.download_to_drive(video_path)
                 
+                # ═══════ Download thumbnail ═══════
+                thumb_file = await context.bot.get_file(cover)
+                thumb_path = f"temp_thumb_{user_id}.jpg"
+                await thumb_file.download_to_drive(thumb_path)
+                
+                # ═══════ Send video with thumbnail ═══════
+                with open(video_path, 'rb') as v:
+                    with open(thumb_path, 'rb') as t:
+                        await context.bot.send_video(
+                            chat_id=saved_channel,
+                            video=InputFile(v),
+                            caption=f"📹 <b>Video from user</b>\n\n"
+                                    f"👤 User: @{username}\n"
+                                    f"📝 Caption: {clean_caption or 'No caption'}",
+                            supports_streaming=True,
+                            thumbnail=InputFile(t),
+                            parse_mode="HTML"
+                        )
+                
+                # ═══════ Cleanup ═══════
+                os.remove(video_path)
+                os.remove(thumb_path)
+                
+                logger.info(f"✅ Video sent to channel {saved_channel} with cover")
                 await update.message.reply_text(
                     f"✅ ᴠɪᴅᴇᴏ sᴇɴᴛ ᴛᴏ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ ᴡɪᴛʜ ᴄᴏᴠᴇʀ!",
                     parse_mode="HTML"
@@ -1343,28 +1352,11 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 
             except Exception as e:
                 logger.error(f"❌ Error sending video to channel: {e}")
-                # ═══════ RETRY: Bina cover ke send karein ═══════
-                try:
-                    await context.bot.send_video(
-                        chat_id=saved_channel,
-                        video=video,
-                        caption=f"📹 <b>Video from user</b>\n\n"
-                                f"👤 User: @{username}",
-                        supports_streaming=True,
-                        parse_mode="HTML"
-                    )
-                    logger.info(f"✅ Video sent without cover to channel {saved_channel}")
-                    await update.message.reply_text(
-                        f"⚠️ ᴠɪᴅᴇᴏ sᴇɴᴛ ʙᴜᴛ ᴄᴏᴠᴇʀ ᴄᴏᴜʟᴅ ɴᴏᴛ ʙᴇ ᴀᴛᴛᴀᴄʜᴇᴅ",
-                        parse_mode="HTML"
-                    )
-                except Exception as e2:
-                    logger.error(f"❌ Error sending video without cover: {e2}")
-                    await update.message.reply_text(
-                        f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
-                        f"ᴍᴀᴋᴇ sᴜʀᴇ ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!",
-                        parse_mode="HTML"
-                    )
+                await update.message.reply_text(
+                    f"⚠️ ᴠɪᴅᴇᴏ ᴘʀᴏᴄᴇssᴇᴅ ʙᴜᴛ ᴄᴏᴜʟᴅ ɴᴏᴛ sᴇɴᴅ ᴛᴏ ᴄʜᴀɴɴᴇʟ\n\n"
+                    f"ᴍᴀᴋᴇ sᴜʀᴇ ʙᴏᴛ ɪs ᴀᴅᴍɪɴ ɪɴ ᴛʜᴇ ᴄʜᴀɴɴᴇʟ!",
+                    parse_mode="HTML"
+                )
         # ══════════════════════════════════════════════
         
         # ✅ LOG CHANNEL
