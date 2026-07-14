@@ -164,7 +164,7 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "<b>How to get Channel ID:</b>\n"
         "1️⃣ Forward any message from your channel to @getidsbot\n"
         "2️⃣ Copy the ID (starts with -100)\n\n"
-        "Example: <code>-1001234567890</code>\n\n"
+        "Example: <code>-1001234567368</code>\n\n"
         "⚠️ Make sure the bot is an admin in that channel!\n\n"
         "To cancel, send /cancel"
     )
