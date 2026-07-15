@@ -3,7 +3,7 @@ import logging
 import asyncio
 import re
 from datetime import datetime
-from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember, ReplyKeyboardRemove
+from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (
     Application,
@@ -386,24 +386,6 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return True
 
 
-async def close_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Har command se pehle keyboard close karne ke liye"""
-    user_id = update.message.from_user.id
-    
-    if context.user_data.get('channel_settings_active', False):
-        context.user_data['channel_settings_active'] = False
-        context.user_data['awaiting_channel_id'] = False
-        
-        # ✅ Keyboard close karo - BINA MESSAGE KE
-        await update.message.reply_text(
-            "",
-            reply_markup=ReplyKeyboardRemove()
-        )
-        
-        logger.info(f"✅ Keyboard closed for user {user_id}")
-    
-    # Command ko aage process karne do
-    return
 
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -424,7 +406,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if query.data == "channel_set":
-        logger.info(f"✅ CHANNEL_SET CALLBACK TRIGGERED for user {user_id}")
         await channel_set_prompt(update, context)
         return
     
@@ -955,11 +936,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """---------------------- Menus--------------------- """
 
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ✅ CLOSE KEYBOARD IF OPEN
-    if context.user_data.get('channel_settings_active', False):
-        context.user_data['channel_settings_active'] = False
-        context.user_data['awaiting_channel_id'] = False
-    
     text = (
     "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
     "• Send/forward Image → Save cover\n"
@@ -1242,13 +1218,17 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
-    
-    # ✅ SIRF TEXT MESSAGE - BINA PHOTO KE
-    await update.message.reply_text(
-        text, 
-        reply_markup=settings_kb, 
-        parse_mode="HTML"
-    )
+    banner = HOME_MENU_BANNER_URL
+    if banner:
+        try:
+            if isinstance(banner, str) and os.path.isfile(banner):
+                await update.message.reply_photo(photo=InputFile(banner), caption=text, reply_markup=settings_kb, parse_mode="HTML")
+            else:
+                await update.message.reply_photo(photo=banner, caption=text, reply_markup=settings_kb, parse_mode="HTML")
+            return
+        except Exception:
+            pass
+    await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
 
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1829,34 +1809,27 @@ def main() -> None:
     register_channel_handlers(app)
     # ════════════════════════════════════════════════════════════════
 
-    # ✅ SAB SE PEHLE HAR COMMAND KE LIYE KEYBOARD CLOSE HANDLER (GROUP 1)
-    app.add_handler(MessageHandler(
-        filters.COMMAND,
-        close_keyboard
-    ), group=1)
+    app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("about", about, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("settings", settings, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("remove", remover, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("showthumbnail", show_thumbnail_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("restart", restart, filters=filters.ChatType.PRIVATE))
+    
+    app.add_handler(CommandHandler("admin", admin_menu, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("ban", ban_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("unban", unban_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("stats", stats_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("status", status_cmd, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler("broadcast", broadcast_cmd, filters=filters.ChatType.PRIVATE))
 
-    # ✅ BAAD MEIN COMMAND HANDLERS (GROUP 2)
-    app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("about", about, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("settings", settings, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("remove", remover, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("showthumbnail", show_thumbnail_cmd, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("restart", restart, filters=filters.ChatType.PRIVATE), group=2)
+    app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, photo_handler))
+    app.add_handler(MessageHandler(filters.VIDEO & filters.ChatType.PRIVATE, video_handler))
     
-    app.add_handler(CommandHandler("admin", admin_menu, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("ban", ban_cmd, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("unban", unban_cmd, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("stats", stats_cmd, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("status", status_cmd, filters=filters.ChatType.PRIVATE), group=2)
-    app.add_handler(CommandHandler("broadcast", broadcast_cmd, filters=filters.ChatType.PRIVATE), group=2)
-
-    app.add_handler(MessageHandler(filters.PHOTO & filters.ChatType.PRIVATE, photo_handler), group=2)
-    app.add_handler(MessageHandler(filters.VIDEO & filters.ChatType.PRIVATE, video_handler), group=2)
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, text_handler))
     
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & filters.ChatType.PRIVATE, text_handler), group=2)
-    
-    app.add_handler(CallbackQueryHandler(callback_handler), group=2)
+    app.add_handler(CallbackQueryHandler(callback_handler))
 
     logger.info("✅ All handlers registered")
     logger.info("🚀 Bot starting...")
