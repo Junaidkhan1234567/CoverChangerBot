@@ -1802,6 +1802,7 @@ def main() -> None:
 
     # ═══════════════════ REGISTER CHANNEL HANDLERS ═══════════════════
     register_channel_handlers(app)
+    register_watermark_handlers(app)
     # ════════════════════════════════════════════════════════════════
 
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
