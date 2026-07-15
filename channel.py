@@ -64,6 +64,18 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
     except Exception as e:
         logger.error(f"Error saving forward enabled status: {e}")
 
+# ═══════════════════ MIDDLEWARE - KEYBOARD REMOVE ═══════════════════
+async def remove_keyboard_after_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Har command ke baad keyboard remove karne ke liye - WITHOUT ANY MESSAGE"""
+    user_id = update.message.from_user.id
+    
+    # ✅ CHANNEL SETTINGS ACTIVE FLAG FALSE KARO
+    context.user_data['channel_settings_active'] = False
+    context.user_data['awaiting_channel_id'] = False
+    
+    # ✅ KEYBOARD REMOVE KARO - BINA MESSAGE KE
+    # Note: ReplyKeyboardRemove directly command response mein use hoga
+
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -350,22 +362,6 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="HTML"
         )
 
-# ═══════════════════ COMMAND HANDLER FOR KEYBOARD REMOVE ═══════════════════
-async def remove_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Kisi bhi command par keyboard off karne ke liye"""
-    user_id = update.message.from_user.id
-    
-    # ✅ CHANNEL SETTINGS ACTIVE FLAG FALSE KARO
-    context.user_data['channel_settings_active'] = False
-    context.user_data['awaiting_channel_id'] = False
-    
-    # ✅ KEYBOARD REMOVE KARO
-    await update.message.reply_text(
-        "✅ Keyboard removed",
-        reply_markup=ReplyKeyboardRemove(),
-        parse_mode="HTML"
-    )
-
 # ═══════════════════ REGISTER HANDLERS ═══════════════════
 def register_channel_handlers(app):
     app.add_handler(CallbackQueryHandler(show_channel_settings, pattern="^channel_settings$"))
@@ -386,15 +382,6 @@ def register_channel_handlers(app):
     ))
     
     app.add_handler(CommandHandler("cancel", cancel_channel_setup))
-    
-    # ✅ KISI BHI COMMAND PAR KEYBOARD OFF KARNE KE LIYE
-    app.add_handler(CommandHandler("start", remove_keyboard))
-    app.add_handler(CommandHandler("help", remove_keyboard))
-    app.add_handler(CommandHandler("about", remove_keyboard))
-    app.add_handler(CommandHandler("settings", remove_keyboard))
-    app.add_handler(CommandHandler("remove", remove_keyboard))
-    app.add_handler(CommandHandler("showthumbnail", remove_keyboard))
-    app.add_handler(CommandHandler("admin", remove_keyboard))
     
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, 
