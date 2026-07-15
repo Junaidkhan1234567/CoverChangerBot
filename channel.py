@@ -67,10 +67,7 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await channel_set_prompt(update, context)
-
-async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show 3 buttons: Toggle Forward, Remove Channel, Back to Settings"""
+    """Show channel settings with 3 buttons"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -104,7 +101,6 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     ]
     
     keyboard_markup = InlineKeyboardMarkup(keyboard)
-    
     context.user_data['awaiting_channel_id'] = True
     
     try:
@@ -116,7 +112,11 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         await query.answer()
     except Exception as e:
-        logger.error(f"Error in channel set prompt: {e}")
+        logger.error(f"Error in channel settings: {e}")
+
+async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show channel settings with 3 buttons"""
+    await show_channel_settings(update, context)
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Toggle forward enabled/disabled"""
@@ -172,7 +172,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_channel = get_user_channel(user_id)
     
     if not current_channel:
-        text = "❌ No channel is currently set.\n\nSend me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
+        text = "❌ No channel is currently set.\n\n📝 Send me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
