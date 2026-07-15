@@ -1215,21 +1215,16 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     settings_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_settings")],
+        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
-    banner = HOME_MENU_BANNER_URL
-    if banner:
-        try:
-            if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(photo=InputFile(banner), caption=text, reply_markup=settings_kb, parse_mode="HTML")
-            else:
-                await update.message.reply_photo(photo=banner, caption=text, reply_markup=settings_kb, parse_mode="HTML")
-            return
-        except Exception:
-            pass
-    await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
-
+    
+    # ✅ SIRF TEXT MESSAGE - BINA PHOTO KE
+    await update.message.reply_text(
+        text, 
+        reply_markup=settings_kb, 
+        parse_mode="HTML"
+    )
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
