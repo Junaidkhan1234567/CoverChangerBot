@@ -103,7 +103,6 @@ async def send_to_channel_if_enabled(context, user_id: int, video_file, caption:
 
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
-# ═══════ NEW: SHOW CHANNEL SETTINGS WITH 3 BUTTONS ═══════
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show channel settings with 3 buttons: Toggle Forward, Remove Channel, Back"""
     query = update.callback_query
