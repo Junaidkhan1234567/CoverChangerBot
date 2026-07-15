@@ -1,6 +1,6 @@
 # channel.py
 import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
 from database import db
@@ -70,7 +70,7 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     await channel_set_prompt(update, context)
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show message with buttons: Toggle Forward, Remove Channel, Back to Settings"""
+    """Show message with reply keyboard buttons"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -83,29 +83,28 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
     
-    # ✅ SIRF SIMPLE TEXT MESSAGE
+    # ✅ TEXT MESSAGE
     text = "👇 <b>Click below button to manage your channel</b>"
     
-    toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
-    
-    keyboard = [
+    # ✅ REPLY KEYBOARD BUTTONS (NORMAL KEYBOARD)
+    reply_keyboard = ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+            ["📤 Toggle Forward", "🗑️ Remove Channel"],
+            ["⬅️ Back to Settings"]
         ],
-        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-    ]
-    
-    keyboard_markup = InlineKeyboardMarkup(keyboard)
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
     
     context.user_data['awaiting_channel_id'] = True
+    context.user_data['channel_settings_active'] = True
     
     try:
-        # ✅ NAYA MESSAGE BHEJO SIRF TEXT KE SATH
+        # ✅ NAYA MESSAGE BHEJO SIRF TEXT KE SATH + REPLY KEYBOARD
         await context.bot.send_message(
             chat_id=user_id,
             text=text,
-            reply_markup=keyboard_markup,
+            reply_markup=reply_keyboard,
             parse_mode="HTML"
         )
         await query.answer()
@@ -115,8 +114,11 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Toggle forward enabled/disabled"""
-    query = update.callback_query
-    user_id = query.from_user.id
+    user_id = update.message.from_user.id
+    
+    # ✅ CHECK KARO KE YEH CHANNEL SETTINGS SE AYA HAI
+    if not context.user_data.get('channel_settings_active', False):
+        return
     
     current_forward_status = get_forward_enabled(user_id)
     new_status = not current_forward_status
@@ -125,7 +127,7 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     
     channel_id = get_user_channel(user_id)
     
-    # ✅ SIRF SIMPLE TEXT MESSAGE
+    # ✅ TEXT MESSAGE
     if new_status:
         text = (
             "✅ <b>Forwarding Enabled</b>\n\n"
@@ -142,50 +144,44 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
             "👇 <b>Click below to manage your channel</b>"
         )
     
-    toggle_text = "📤 Forward OFF" if new_status else "📤 Forward ON"
-    keyboard = InlineKeyboardMarkup([
+    # ✅ REPLY KEYBOARD
+    reply_keyboard = ReplyKeyboardMarkup(
         [
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+            ["📤 Toggle Forward", "🗑️ Remove Channel"],
+            ["⬅️ Back to Settings"]
         ],
-        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-    ])
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
     
     try:
-        # ✅ OLD MESSAGE DELETE KARO AUR NAYA BHEJO
-        try:
-            await query.message.delete()
-        except Exception:
-            pass
-        
-        await context.bot.send_message(
-            chat_id=user_id,
+        await update.message.reply_text(
             text=text,
-            reply_markup=keyboard,
+            reply_markup=reply_keyboard,
             parse_mode="HTML"
         )
-        await query.answer()
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel - shows simple success message"""
-    query = update.callback_query
-    user_id = query.from_user.id
+    """Remove saved channel"""
+    user_id = update.message.from_user.id
+    
+    # ✅ CHECK KARO KE YEH CHANNEL SETTINGS SE AYA HAI
+    if not context.user_data.get('channel_settings_active', False):
+        return
     
     current_channel = get_user_channel(user_id)
     
-    # ✅ OLD MESSAGE DELETE KARO
-    try:
-        await query.message.delete()
-    except Exception:
-        pass
-    
     if not current_channel:
         text = "❌ No channel is currently set.\n\nSend me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-        ])
+        reply_keyboard = ReplyKeyboardMarkup(
+            [
+                ["⬅️ Back to Settings"]
+            ],
+            resize_keyboard=True,
+            one_time_keyboard=False
+        )
         context.user_data['awaiting_channel_id'] = True
     else:
         save_user_channel(user_id, None)
@@ -194,23 +190,21 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         text = "✅ Channel removed successfully!\n\n👇 <b>Click below to manage your channel</b>"
         
-        keyboard = InlineKeyboardMarkup([
+        reply_keyboard = ReplyKeyboardMarkup(
             [
-                InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
-                InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+                ["📤 Toggle Forward", "🗑️ Remove Channel"],
+                ["⬅️ Back to Settings"]
             ],
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-        ])
+            resize_keyboard=True,
+            one_time_keyboard=False
+        )
     
     try:
-        # ✅ NAYA MESSAGE BHEJO
-        await context.bot.send_message(
-            chat_id=user_id,
+        await update.message.reply_text(
             text=text,
-            reply_markup=keyboard,
+            reply_markup=reply_keyboard,
             parse_mode="HTML"
         )
-        await query.answer()
     except Exception as e:
         logger.error(f"Error removing channel: {e}")
 
@@ -253,17 +247,18 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 "👇 <b>Click below to manage your channel</b>"
             )
             
-            keyboard = InlineKeyboardMarkup([
+            reply_keyboard = ReplyKeyboardMarkup(
                 [
-                    InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
-                    InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+                    ["📤 Toggle Forward", "🗑️ Remove Channel"],
+                    ["⬅️ Back to Settings"]
                 ],
-                [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-            ])
+                resize_keyboard=True,
+                one_time_keyboard=False
+            )
             
             await update.message.reply_text(
-                text, 
-                reply_markup=keyboard, 
+                text=text,
+                reply_markup=reply_keyboard,
                 parse_mode="HTML"
             )
             
@@ -308,9 +303,18 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if context.user_data.get('awaiting_channel_id', False):
         context.user_data['awaiting_channel_id'] = False
+        context.user_data['channel_settings_active'] = False
+        
+        # ✅ REMOVE KEYBOARD
+        reply_keyboard = ReplyKeyboardMarkup(
+            [[]],
+            resize_keyboard=True
+        )
+        
         await update.message.reply_text(
             "❌ <b>Channel Setup Cancelled</b>\n\n"
             "You can start again anytime from Settings.",
+            reply_markup=reply_keyboard,
             parse_mode="HTML"
         )
         logger.info(f"User {user_id} cancelled channel setup")
@@ -324,8 +328,20 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
 def register_channel_handlers(app):
     app.add_handler(CallbackQueryHandler(show_channel_settings, pattern="^channel_settings$"))
     app.add_handler(CallbackQueryHandler(channel_set_prompt, pattern="^channel_set$"))
-    app.add_handler(CallbackQueryHandler(channel_toggle_forward, pattern="^channel_toggle_forward$"))
-    app.add_handler(CallbackQueryHandler(channel_remove, pattern="^channel_remove$"))
+    
+    # ✅ TEXT HANDLERS FOR REPLY KEYBOARD BUTTONS
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex('^📤 Toggle Forward$'),
+        channel_toggle_forward
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex('^🗑️ Remove Channel$'),
+        channel_remove
+    ))
+    app.add_handler(MessageHandler(
+        filters.TEXT & filters.Regex('^⬅️ Back to Settings$'),
+        channel_set_prompt
+    ))
     
     app.add_handler(CommandHandler("cancel", cancel_channel_setup))
     
