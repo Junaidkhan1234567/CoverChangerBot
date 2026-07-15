@@ -1872,7 +1872,8 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sent += 1
             except Exception as e:
                 logger.warning(f"Could not send broadcast to user {user_id}: {e}")
-                failed += 1        
+                failed += 1
+        
         result_text = (
             "✅ Broadcast Completed\n\n"
             f"📤 Sent: {sent}\n"
@@ -1904,6 +1905,27 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle all text messages:
+    1. Agar channel settings active hai aur command aayi -> keyboard close karo
+    2. Agar channel ID input hai -> handle karo
+    3. Baaki unknown command
+    """
+    
+    # ✅ CHECK: Agar channel settings active hai aur koi command aayi hai
+    if context.user_data.get('channel_settings_active', False):
+        # ✅ Agar message / se start ho raha hai (command hai)
+        if update.message.text and update.message.text.startswith('/'):
+            # ✅ Keyboard close karo - BINA MESSAGE KE
+            context.user_data['channel_settings_active'] = False
+            context.user_data['awaiting_channel_id'] = False
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+            # ✅ Command ko aage process mat karo
+            return
+    
     if not await check_force_sub(update, context):
         return
     
