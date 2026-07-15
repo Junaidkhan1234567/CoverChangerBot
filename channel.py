@@ -107,17 +107,14 @@ def get_channel_reply_keyboard() -> ReplyKeyboardMarkup:
     keyboard = [
         [KeyboardButton("📝 Set Channel")],
         [KeyboardButton("🗑️ Remove Channel")],
-        [KeyboardButton("⚙️ Back to Settings")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 def get_channel_settings_reply_keyboard() -> ReplyKeyboardMarkup:
     """Get reply keyboard for channel settings sub-menu"""
     keyboard = [
-        [KeyboardButton("📝 Set Channel")],
+        [KeyboardButton("📝 Set Channel"),
         [KeyboardButton("🗑️ Remove Channel")],
-        [KeyboardButton("⬅️ Back to Channel Settings")],
-        [KeyboardButton("⚙️ Back to Settings")],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
