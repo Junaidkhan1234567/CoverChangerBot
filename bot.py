@@ -1165,35 +1165,63 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show settings menu with Watermark option"""
     if not await check_force_sub(update, context):
         return
+    
     user_id = update.message.from_user.id
     thumb_status = "✅ Saved & Ready" if has_thumbnail(user_id) else "❌ Not saved yet"
     
+    # Get watermark status for display
+    watermark_settings = get_watermark_settings(user_id)
+    watermark_status = "🟢 ON" if watermark_settings.get("enabled", False) else "🔴 OFF"
+    
+    # Get caption status for display
+    caption_settings = get_caption_format(user_id)
+    caption_status = "🟢 ON" if caption_settings.get("format_type") != "none" else "🔴 OFF"
+    
     text = (
-        "⚙️ Your Settings\n\n"
-        "<b>Account information:</b>\n"
-        f"👤 User ID: <code>{user_id}</code>\n\n"
-        "<b>Thumbnail status:</b>\n"
-        f"{thumb_status}\n\n"
-        "<b>Management options:</b>\n"
-        "🖼️ View and manage your thumbnails"
+        "⚙️ <b>Settings</b>\n\n"
+        "<b>📸 Thumbnail:</b>\n"
+        f"   {thumb_status}\n\n"
+        "<b>📝 Caption:</b>\n"
+        f"   {caption_status}\n\n"
+        "<b>💧 Watermark:</b>\n"
+        f"   {watermark_status}\n\n"
+        "<b>📢 Channel:</b>\n"
+        f"   {get_user_channel(user_id) or 'Not set'}\n\n"
+        "👇 <b>Select an option below:</b>"
     )
+    
     settings_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_settings")],
+        [InlineKeyboardButton("📢 Add Your Channel", callback_data="channel_settings")],
+        [InlineKeyboardButton("💧 Watermark", callback_data="watermark_settings")],  # ← NEW: Below Add Channel
+        [InlineKeyboardButton("📝 Caption Settings", callback_data="caption_settings")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
+    
     banner = HOME_MENU_BANNER_URL
     if banner:
         try:
             if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(photo=InputFile(banner), caption=text, reply_markup=settings_kb, parse_mode="HTML")
+                await update.message.reply_photo(
+                    photo=InputFile(banner), 
+                    caption=text, 
+                    reply_markup=settings_kb, 
+                    parse_mode="HTML"
+                )
             else:
-                await update.message.reply_photo(photo=banner, caption=text, reply_markup=settings_kb, parse_mode="HTML")
+                await update.message.reply_photo(
+                    photo=banner, 
+                    caption=text, 
+                    reply_markup=settings_kb, 
+                    parse_mode="HTML"
+                )
             return
         except Exception:
             pass
+    
     await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
 
 
