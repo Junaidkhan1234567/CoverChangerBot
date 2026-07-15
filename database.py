@@ -307,3 +307,48 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
     action = "🗑️ Thumbnail Removed"
     logger.info(f"✅ {action} - {username} ({user_id})")
     return create_log_entry(user_id, username, action)
+
+# ============================================
+# ADD Wararmek 
+# ============================================
+
+def save_watermark_settings(user_id: int, settings: dict) -> bool:
+    """Save user's watermark settings"""
+    try:
+        # Add timestamp
+        settings["updated_at"] = datetime.now()
+        
+        users_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"watermark_settings": settings}},
+            upsert=True
+        )
+        logger.info(f"✅ Watermark settings saved for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error saving watermark settings: {e}")
+        return False
+
+def get_watermark_settings(user_id: int) -> dict:
+    """Get user's watermark settings"""
+    try:
+        user = users_collection.find_one({"user_id": user_id})
+        if user and "watermark_settings" in user:
+            return user["watermark_settings"]
+        # Default settings
+        return {
+            "enabled": False,
+            "text": "© {username} • Video Cover Bot",
+            "position": "bottom-right",
+            "opacity": 0.7,
+            "font_size": 30
+        }
+    except Exception as e:
+        logger.error(f"❌ Error getting watermark settings: {e}")
+        return {
+            "enabled": False,
+            "text": "© {username} • Video Cover Bot",
+            "position": "bottom-right",
+            "opacity": 0.7,
+            "font_size": 30
+        }
