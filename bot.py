@@ -3,7 +3,7 @@ import logging
 import asyncio
 import re
 from datetime import datetime
-from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
+from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember, ReplyKeyboardRemove
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (
     Application,
@@ -386,6 +386,18 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return True
 
 
+async def close_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Close keyboard without any message"""
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
 
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -937,6 +949,11 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """---------------------- Menus--------------------- """
 
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+    
     text = (
     "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
     "• Send/forward Image → Save cover\n"
@@ -1019,6 +1036,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     first_name = update.effective_user.first_name or "User"
     
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     # ✅ CHECK: KYA USER PEHLE SE EXISTS KARTA HAI?
     user_check = get_thumbnail(user_id)
     is_new_user = user_check is None
@@ -1090,6 +1119,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def show_thumbnail_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_force_sub(update, context):
         return
     
@@ -1133,6 +1174,18 @@ async def show_thumbnail_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_force_sub(update, context):
         return
     text = (
@@ -1168,6 +1221,18 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_force_sub(update, context):
         return
     text = (
@@ -1200,6 +1265,18 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_force_sub(update, context):
         return
     user_id = update.message.from_user.id
@@ -1229,6 +1306,18 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_force_sub(update, context):
         return
     
@@ -1433,6 +1522,18 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     user_id = update.effective_user.id
 
     if user_id != OWNER_ID:
@@ -1483,6 +1584,18 @@ async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """══════════════════ ADMIN COMMANDS ══════════════════"""
 
 async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_admin(update):
         return
     
@@ -1534,6 +1647,18 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_admin(update):
         return
     
@@ -1567,6 +1692,18 @@ async def ban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_admin(update):
         return
     
@@ -1594,6 +1731,18 @@ async def unban_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_admin(update):
         return
     
@@ -1608,6 +1757,18 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_admin(update):
         return
     
@@ -1645,6 +1806,18 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ✅ CLOSE KEYBOARD IF OPEN
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+    
     if not await check_admin(update):
         return
     
@@ -1699,8 +1872,7 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 sent += 1
             except Exception as e:
                 logger.warning(f"Could not send broadcast to user {user_id}: {e}")
-                failed += 1
-        
+                failed += 1        
         result_text = (
             "✅ Broadcast Completed\n\n"
             f"📤 Sent: {sent}\n"
