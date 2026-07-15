@@ -1,4 +1,4 @@
-# channel.py
+# channel.py (complete file with channel_remove function)
 import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
@@ -290,46 +290,7 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
 
-async def channel_remove_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel - called from reply keyboard"""
-    user_id = update.message.from_user.id
-    
-    current_channel = get_user_channel(user_id)
-    
-    if not current_channel:
-        text = "❌ No channel is currently set.\n\nYou can set one by clicking 'Set Channel'."
-        
-        # Reply keyboard with Set Channel and back buttons
-        reply_keyboard = get_channel_settings_reply_keyboard()
-        
-        await update.message.reply_text(
-            text,
-            reply_markup=reply_keyboard,
-            parse_mode="HTML"
-        )
-    else:
-        save_user_channel(user_id, None)  # Remove from database
-        # Also reset forward enabled to default
-        save_forward_enabled(user_id, True)
-        text = (
-            "🗑️ <b>Channel Removed</b>\n\n"
-            f"Removed: <code>{current_channel}</code>\n\n"
-            "You can set a new channel anytime.\n"
-            "Forwarding has been reset to enabled by default."
-        )
-        
-        # Show reply keyboard with back buttons
-        reply_keyboard = get_channel_settings_reply_keyboard()
-        
-        await update.message.reply_text(
-            text,
-            reply_markup=reply_keyboard,
-            parse_mode="HTML"
-        )
-    
-    logger.info(f"User {user_id} removed channel: {current_channel}")
-
-async def channel_remove_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Remove saved channel - called from callback query"""
     query = update.callback_query
     user_id = query.from_user.id
@@ -384,6 +345,45 @@ async def channel_remove_callback(update: Update, context: ContextTypes.DEFAULT_
             await query.answer()
         except Exception as e:
             logger.error(f"Error removing channel: {e}")
+    
+    logger.info(f"User {user_id} removed channel: {current_channel}")
+
+async def channel_remove_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Remove saved channel - called from reply keyboard"""
+    user_id = update.message.from_user.id
+    
+    current_channel = get_user_channel(user_id)
+    
+    if not current_channel:
+        text = "❌ No channel is currently set.\n\nYou can set one by clicking 'Set Channel'."
+        
+        # Reply keyboard with Set Channel and back buttons
+        reply_keyboard = get_channel_settings_reply_keyboard()
+        
+        await update.message.reply_text(
+            text,
+            reply_markup=reply_keyboard,
+            parse_mode="HTML"
+        )
+    else:
+        save_user_channel(user_id, None)  # Remove from database
+        # Also reset forward enabled to default
+        save_forward_enabled(user_id, True)
+        text = (
+            "🗑️ <b>Channel Removed</b>\n\n"
+            f"Removed: <code>{current_channel}</code>\n\n"
+            "You can set a new channel anytime.\n"
+            "Forwarding has been reset to enabled by default."
+        )
+        
+        # Show reply keyboard with back buttons
+        reply_keyboard = get_channel_settings_reply_keyboard()
+        
+        await update.message.reply_text(
+            text,
+            reply_markup=reply_keyboard,
+            parse_mode="HTML"
+        )
     
     logger.info(f"User {user_id} removed channel: {current_channel}")
 
@@ -500,7 +500,7 @@ def register_channel_handlers(app):
     app.add_handler(CallbackQueryHandler(show_channel_settings, pattern="^channel_settings$"))
     app.add_handler(CallbackQueryHandler(channel_set_prompt, pattern="^channel_set$"))
     app.add_handler(CallbackQueryHandler(channel_toggle_forward, pattern="^channel_toggle_forward$"))
-    app.add_handler(CallbackQueryHandler(channel_remove_callback, pattern="^channel_remove$"))
+    app.add_handler(CallbackQueryHandler(channel_remove, pattern="^channel_remove$"))  # <-- channel_remove name
     
     # Reply keyboard handlers
     app.add_handler(MessageHandler(
