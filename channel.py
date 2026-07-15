@@ -1,6 +1,6 @@
 # channel.py
 import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
 from database import db
@@ -101,6 +101,22 @@ async def send_to_channel_if_enabled(context, user_id: int, video_file, caption:
         logger.error(f"❌ Failed to forward to channel {channel_id}: {e}")
         return False, channel_id
 
+# ═══════════════════ REPLY KEYBOARD HELPERS ═══════════════════
+def get_channel_reply_keyboard() -> ReplyKeyboardMarkup:
+    """Get reply keyboard for channel settings"""
+    keyboard = [
+        [KeyboardButton("⚙️ Back to Settings")],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+
+def get_channel_settings_reply_keyboard() -> ReplyKeyboardMarkup:
+    """Get reply keyboard for channel settings sub-menu"""
+    keyboard = [
+        [KeyboardButton("⬅️ Back to Channel Settings")],
+        [KeyboardButton("⚙️ Back to Settings")],
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
+
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Show channel settings menu"""
@@ -142,7 +158,8 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     else:
         keyboard.append([InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")])
     
-    keyboard.append([InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")])
+    # Show reply keyboard with back button
+    reply_keyboard = get_channel_reply_keyboard()
     
     keyboard_markup = InlineKeyboardMarkup(keyboard)
     
@@ -152,6 +169,12 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
             await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
         else:
             await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
+        
+        # Send reply keyboard
+        await query.message.reply_text(
+            "Use the buttons below to navigate:",
+            reply_markup=reply_keyboard
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error showing channel settings: {e}")
@@ -175,6 +198,9 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         [InlineKeyboardButton("⬅️ Back", callback_data="channel_settings")]
     ])
     
+    # Show reply keyboard with back buttons
+    reply_keyboard = get_channel_settings_reply_keyboard()
+    
     context.user_data['awaiting_channel_id'] = True
     
     try:
@@ -183,6 +209,12 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
         else:
             await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        
+        # Send reply keyboard
+        await query.message.reply_text(
+            "Use the buttons below to navigate:",
+            reply_markup=reply_keyboard
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
@@ -214,17 +246,21 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
             "Videos will only be sent in the bot chat."
         )
     
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Back to Channel Settings", callback_data="channel_settings")],
-        [InlineKeyboardButton("⚙️ Main Menu", callback_data="menu_settings")]
-    ])
+    # Show reply keyboard with back buttons
+    reply_keyboard = get_channel_settings_reply_keyboard()
     
     try:
         msg = query.message
         if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
+            await msg.edit_caption(text, parse_mode="HTML")
         else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+            await msg.edit_text(text, parse_mode="HTML")
+        
+        # Send reply keyboard
+        await query.message.reply_text(
+            "Use the buttons below to navigate:",
+            reply_markup=reply_keyboard
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
@@ -242,6 +278,24 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📝 Set Channel", callback_data="channel_set")],
             [InlineKeyboardButton("⬅️ Back", callback_data="channel_settings")]
         ])
+        
+        # Show reply keyboard with back buttons
+        reply_keyboard = get_channel_settings_reply_keyboard()
+        
+        try:
+            msg = query.message
+            if hasattr(msg, "photo") and msg.photo:
+                await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
+            else:
+                await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+            
+            await query.message.reply_text(
+                "Use the buttons below to navigate:",
+                reply_markup=reply_keyboard
+            )
+            await query.answer()
+        except Exception as e:
+            logger.error(f"Error in channel_remove: {e}")
     else:
         save_user_channel(user_id, None)  # Remove from database
         # Also reset forward enabled to default
@@ -252,20 +306,24 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "You can set a new channel anytime.\n"
             "Forwarding has been reset to enabled by default."
         )
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📝 Set New Channel", callback_data="channel_set")],
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="channel_settings")]
-        ])
-    
-    try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-        await query.answer()
-    except Exception as e:
-        logger.error(f"Error removing channel: {e}")
+        
+        # Show reply keyboard with back buttons
+        reply_keyboard = get_channel_settings_reply_keyboard()
+        
+        try:
+            msg = query.message
+            if hasattr(msg, "photo") and msg.photo:
+                await msg.edit_caption(text, parse_mode="HTML")
+            else:
+                await msg.edit_text(text, parse_mode="HTML")
+            
+            await query.message.reply_text(
+                "Use the buttons below to navigate:",
+                reply_markup=reply_keyboard
+            )
+            await query.answer()
+        except Exception as e:
+            logger.error(f"Error removing channel: {e}")
 
 async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle channel ID input from user"""
@@ -308,12 +366,14 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 "ℹ️ You can disable forwarding from Channel Settings."
             )
             
-            keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("⚙️ Back to Settings", callback_data="menu_settings")],
-                [InlineKeyboardButton("🔗 Channel Settings", callback_data="channel_settings")]
-            ])
+            # Show reply keyboard with back buttons
+            reply_keyboard = get_channel_settings_reply_keyboard()
             
-            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+            await update.message.reply_text(
+                text, 
+                reply_markup=reply_keyboard, 
+                parse_mode="HTML"
+            )
             
             # ═══════ DEBUG LOG ═══════
             logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
@@ -381,6 +441,16 @@ def register_channel_handlers(app):
     
     app.add_handler(CommandHandler("cancel", cancel_channel_setup))
     
+    # Add handlers for reply keyboard buttons
+    app.add_handler(MessageHandler(
+        filters.Regex("^⚙️ Back to Settings$"), 
+        handle_back_to_settings
+    ))
+    app.add_handler(MessageHandler(
+        filters.Regex("^⬅️ Back to Channel Settings$"), 
+        handle_back_to_channel_settings
+    ))
+    
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, 
         handle_channel_id_input
@@ -388,3 +458,32 @@ def register_channel_handlers(app):
     
     logger.info("✅ Channel handlers registered successfully")
     return app
+
+# ═══════════════════ REPLY KEYBOARD HANDLERS ═══════════════════
+async def handle_back_to_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle 'Back to Settings' reply keyboard button"""
+    from settings import show_settings  # Import here to avoid circular import
+    await show_settings(update, context)
+
+async def handle_back_to_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle 'Back to Channel Settings' reply keyboard button"""
+    # Create a fake callback query to reuse the show_channel_settings function
+    class FakeQuery:
+        def __init__(self, user):
+            self.from_user = user
+        
+        async def answer(self):
+            pass
+    
+    # Get the user from the message
+    user_id = update.message.from_user.id
+    
+    # Create a fake update with callback_query
+    fake_update = Update(
+        update.update_id,
+        message=update.message,
+        callback_query=FakeQuery(update.message.from_user)
+    )
+    
+    # Call show_channel_settings with the fake update
+    await show_channel_settings(fake_update, context)
