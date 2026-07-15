@@ -1,6 +1,6 @@
 # channel.py
 import logging
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
 from database import db
@@ -86,11 +86,21 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     # ✅ CURRENT STATUS DIKHAO
     status_text = "✅ Enabled" if forward_enabled else "❌ Disabled"
     
-    text = (
-        f"🔗 <b>Channel Settings</b>\n\n"
-        f"📤 <b>Forward Status:</b> {status_text}\n\n"
-        "👇 <b>Click below to manage your channel</b>"
-    )
+    if current_channel:
+        text = (
+            f"🔗 <b>Channel Settings</b>\n\n"
+            f"📌 <b>Channel:</b> <code>{current_channel}</code>\n"
+            f"📤 <b>Forward Status:</b> {status_text}\n\n"
+            "👇 <b>Click below to manage your channel</b>"
+        )
+    else:
+        text = (
+            f"🔗 <b>Channel Settings</b>\n\n"
+            f"❌ <b>No channel set yet</b>\n\n"
+            "📝 Send me your Channel ID to set it.\n"
+            "Example: <code>-1001234567890</code>\n\n"
+            "👇 <b>Click below to manage your channel</b>"
+        )
     
     # ✅ BUTTON TEXT ON/OFF KE HISAB SE CHANGE HOGA
     toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
@@ -173,7 +183,7 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel"""
+    """Remove saved channel - Sirf simple message"""
     user_id = update.message.from_user.id
     
     # ✅ CHECK KARO KE YEH CHANNEL SETTINGS SE AYA HAI
@@ -186,6 +196,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = "❌ No channel is currently set.\n\nSend me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
         reply_keyboard = ReplyKeyboardMarkup(
             [
+                ["📤 Forward ON", "🗑️ Remove Channel"],
                 ["⬅️ Back to Settings"]
             ],
             resize_keyboard=True,
@@ -193,11 +204,13 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         context.user_data['awaiting_channel_id'] = True
     else:
+        # ✅ CHANNEL REMOVE KARO
         save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
         context.user_data['awaiting_channel_id'] = True
         
-        text = "✅ Channel removed successfully!"
+        # ✅ SIRF YEH MESSAGE AAYEGA
+        text = "✅ Delete your channel successfully"
         
         # ✅ CHANNEL REMOVE KARNE KE BAAD BUTTON "📤 Forward OFF" HOGA
         reply_keyboard = ReplyKeyboardMarkup(
@@ -323,16 +336,11 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
         context.user_data['awaiting_channel_id'] = False
         context.user_data['channel_settings_active'] = False
         
-        # ✅ REMOVE KEYBOARD
-        reply_keyboard = ReplyKeyboardMarkup(
-            [[]],
-            resize_keyboard=True
-        )
-        
+        # ✅ REMOVE KEYBOARD - OFF HO JAYEGA
         await update.message.reply_text(
             "❌ <b>Channel Setup Cancelled</b>\n\n"
             "You can start again anytime from Settings.",
-            reply_markup=reply_keyboard,
+            reply_markup=ReplyKeyboardRemove(),
             parse_mode="HTML"
         )
         logger.info(f"User {user_id} cancelled channel setup")
@@ -341,6 +349,22 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
             "ℹ️ No ongoing channel setup to cancel.",
             parse_mode="HTML"
         )
+
+# ═══════════════════ COMMAND HANDLER FOR KEYBOARD REMOVE ═══════════════════
+async def remove_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Kisi bhi command par keyboard off karne ke liye"""
+    user_id = update.message.from_user.id
+    
+    # ✅ CHANNEL SETTINGS ACTIVE FLAG FALSE KARO
+    context.user_data['channel_settings_active'] = False
+    context.user_data['awaiting_channel_id'] = False
+    
+    # ✅ KEYBOARD REMOVE KARO
+    await update.message.reply_text(
+        "✅ Keyboard removed",
+        reply_markup=ReplyKeyboardRemove(),
+        parse_mode="HTML"
+    )
 
 # ═══════════════════ REGISTER HANDLERS ═══════════════════
 def register_channel_handlers(app):
@@ -362,6 +386,15 @@ def register_channel_handlers(app):
     ))
     
     app.add_handler(CommandHandler("cancel", cancel_channel_setup))
+    
+    # ✅ KISI BHI COMMAND PAR KEYBOARD OFF KARNE KE LIYE
+    app.add_handler(CommandHandler("start", remove_keyboard))
+    app.add_handler(CommandHandler("help", remove_keyboard))
+    app.add_handler(CommandHandler("about", remove_keyboard))
+    app.add_handler(CommandHandler("settings", remove_keyboard))
+    app.add_handler(CommandHandler("remove", remove_keyboard))
+    app.add_handler(CommandHandler("showthumbnail", remove_keyboard))
+    app.add_handler(CommandHandler("admin", remove_keyboard))
     
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND, 
