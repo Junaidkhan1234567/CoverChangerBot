@@ -27,6 +27,7 @@ from database import (
 from telegram import MessageEntity
 from flask import Flask
 import threading
+from watermark import register_watermark_handlers
 
 # ═══════════════════ CHANNEL IMPORTS ═══════════════════
 from channel import (
