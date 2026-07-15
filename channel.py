@@ -123,8 +123,8 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     text += (
         "<b>Options:</b>\n"
         "📝 <b>Set Channel</b> – Send new channel ID\n"
-        "🗑️ <b>Remove Channel</b> – Clear current channel\n"
-        "📤 <b>Toggle Forward</b> – Enable/disable forwarding"
+        "📤 <b>Toggle Forward</b> – Enable/disable forwarding\n"
+        "🗑️ <b>Remove Channel</b> – Clear current channel"
     )
     
     # Dynamic buttons based on channel status
@@ -137,8 +137,8 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
         toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
         keyboard.append([
             InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove", callback_data="channel_remove")
-        ]) 
+            InlineKeyboardButton("🗑️ Delete Channel", callback_data="channel_remove")
+        ])
     else:
         keyboard.append([InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")])
     
@@ -166,7 +166,7 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "<b>How to get Channel ID:</b>\n"
         "1️⃣ Forward any message from your channel to @getidsbot\n"
         "2️⃣ Copy the ID (starts with -100)\n\n"
-        "Example: <code>-1001234567368</code>\n\n"
+        "Example: <code>-1001234567890</code>\n\n"
         "⚠️ Make sure the bot is an admin in that channel!\n\n"
         "To cancel, send /cancel"
     )
@@ -388,30 +388,3 @@ def register_channel_handlers(app):
     
     logger.info("✅ Channel handlers registered successfully")
     return app
-
-
-async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings menu"""
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    current_channel = get_user_channel(user_id)
-    forward_enabled = get_forward_enabled(user_id)
-    
-    text = "🔗 <b>Channel Settings</b>\n\n"
-    text += "Set a channel where the bot will send processed videos.\n\n"
-    
-    if current_channel:
-        text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n"
-        forward_status = "✅ Enabled" if forward_enabled else "❌ Disabled"
-        text += f"📤 <b>Forward to Channel:</b> {forward_status}\n\n"
-    else:
-        text += "❌ <b>No channel set yet</b>\n\n"
-    
-    text += (
-        "<b>Options:</b>\n"
-        "📝 <b>Set Channel</b> – Send new channel ID\n"
-        "📤 <b>Toggle Forward</b> – Enable/disable forwarding\n"
-        "🗑️ <b>Remove Channel</b> – Clear current channel"
-    )
-    
