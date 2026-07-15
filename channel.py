@@ -1,4 +1,4 @@
-# channel.py (complete file with channel_remove function)
+# channel.py
 import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, ReplyKeyboardMarkup, KeyboardButton
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
@@ -27,7 +27,7 @@ def get_forward_enabled(user_id: int) -> bool:
         user_data = users_collection.find_one({"user_id": user_id})
         if user_data and "forward_enabled" in user_data:
             return user_data["forward_enabled"]
-        return True  # Default: forward enabled
+        return True
     except Exception as e:
         logger.error(f"Error getting forward enabled status: {e}")
         return True
@@ -41,14 +41,12 @@ def save_user_channel(user_id: int, channel_id: str) -> None:
     try:
         users_collection = db.get_collection("users")
         if channel_id is None:
-            # Remove channel_id from user document
             users_collection.update_one(
                 {"user_id": user_id},
                 {"$unset": {"channel_id": ""}},
                 upsert=True
             )
         else:
-            # Save channel_id
             users_collection.update_one(
                 {"user_id": user_id},
                 {"$set": {"channel_id": channel_id}},
@@ -73,10 +71,7 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
 
 # ═══════════════════ SEND TO CHANNEL HELPER ═══════════════════
 async def send_to_channel_if_enabled(context, user_id: int, video_file, caption: str = "", **kwargs):
-    """
-    Send video to user's channel only if forwarding is enabled.
-    Returns: (sent: bool, channel_id: str or None)
-    """
+    """Send video to user's channel only if forwarding is enabled."""
     channel_id = get_user_channel(user_id)
     forward_enabled = should_forward_to_channel(user_id)
     
@@ -103,31 +98,33 @@ async def send_to_channel_if_enabled(context, user_id: int, video_file, caption:
 
 # ═══════════════════ REPLY KEYBOARD HELPERS ═══════════════════
 def get_channel_reply_keyboard() -> ReplyKeyboardMarkup:
-    """Get reply keyboard for channel settings"""
+    """Get reply keyboard for channel settings - Set Channel and Remove Channel in one row"""
     keyboard = [
-        [KeyboardButton("📝 Set Channel")],
-        [KeyboardButton("🗑️ Remove Channel")],
+        [KeyboardButton("📝 Set Channel"), KeyboardButton("🗑️ Remove Channel")],  # Ek hi row mein
+        [KeyboardButton("⚙️ Back to Settings")],  # Niche ki row
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
 def get_channel_settings_reply_keyboard() -> ReplyKeyboardMarkup:
     """Get reply keyboard for channel settings sub-menu"""
     keyboard = [
-        [KeyboardButton("📝 Set Channel"),
-        [KeyboardButton("🗑️ Remove Channel")],
+        [KeyboardButton("📝 Set Channel"), KeyboardButton("🗑️ Remove Channel")],  # Ek hi row mein
+        [KeyboardButton("⬅️ Back to Channel Settings")],  # Niche row 1
+        [KeyboardButton("⚙️ Back to Settings")],  # Niche row 2
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=False)
 
-# ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
+# ═══════════════════ CHANNEL SETTINGS FUNCTIONS ═══════════════════
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings menu"""
-    # Check if this is from callback query or message
+    """Show channel settings menu - No inline buttons"""
     if update.callback_query:
         query = update.callback_query
         user_id = query.from_user.id
         await query.answer()
+        msg = query.message
     else:
         user_id = update.message.from_user.id
+        msg = update.message
     
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
@@ -139,61 +136,45 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
         text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n"
         forward_status = "✅ Enabled" if forward_enabled else "❌ Disabled"
         text += f"📤 <b>Forward to Channel:</b> {forward_status}\n\n"
+        
+        # Toggle forward status in text
+        toggle_text = "Disable Forwarding" if forward_enabled else "Enable Forwarding"
+        text += f"💡 <b>Action:</b> Type /toggle to {toggle_text}\n\n"
     else:
         text += "❌ <b>No channel set yet</b>\n\n"
     
     text += (
         "<b>Options:</b>\n"
         "📝 <b>Set Channel</b> – Send new channel ID\n"
-        "📤 <b>Toggle Forward</b> – Enable/disable forwarding\n"
+        "📤 <b>Toggle Forward</b> – Type /toggle\n"
         "🗑️ <b>Remove Channel</b> – Clear current channel"
     )
     
-    # Dynamic inline buttons based on channel status
-    keyboard = []
-    
-    if current_channel:
-        # Add toggle forward button
-        toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
-        keyboard.append([InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward")])
-    
-    keyboard.append([InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")])
-    
-    keyboard_markup = InlineKeyboardMarkup(keyboard) if keyboard else None
-    
-    # Reply keyboard with Set Channel and Remove Channel buttons
+    # ONLY reply keyboard - NO inline buttons
     reply_keyboard = get_channel_reply_keyboard()
     
     try:
         if update.callback_query:
-            msg = update.callback_query.message
             if hasattr(msg, "photo") and msg.photo:
-                await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
+                await msg.edit_caption(text, parse_mode="HTML")
             else:
-                await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
+                await msg.edit_text(text, parse_mode="HTML")
             
-            # Send reply keyboard
             await msg.reply_text(
                 "Use the buttons below:",
                 reply_markup=reply_keyboard
             )
         else:
-            # If called from message, send new message
-            await update.message.reply_text(
+            await msg.reply_text(
                 text,
-                reply_markup=keyboard_markup,
+                reply_markup=reply_keyboard,
                 parse_mode="HTML"
-            )
-            await update.message.reply_text(
-                "Use the buttons below:",
-                reply_markup=reply_keyboard
             )
     except Exception as e:
         logger.error(f"Error showing channel settings: {e}")
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Prompt user to send channel ID"""
-    # Check if called from callback or message
     if update.callback_query:
         query = update.callback_query
         await query.answer()
@@ -219,7 +200,6 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         if update.callback_query:
-            # Edit existing message
             if hasattr(msg, "photo") and msg.photo:
                 await msg.edit_caption(text, parse_mode="HTML")
             else:
@@ -230,7 +210,6 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 reply_markup=reply_keyboard
             )
         else:
-            # Send new message
             await msg.reply_text(
                 text,
                 parse_mode="HTML"
@@ -243,9 +222,8 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.error(f"Error in channel set prompt: {e}")
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Toggle forward enabled/disabled"""
-    query = update.callback_query
-    user_id = query.from_user.id
+    """Toggle forward enabled/disabled - Command handler"""
+    user_id = update.message.from_user.id
     
     current_forward_status = get_forward_enabled(user_id)
     new_status = not current_forward_status
@@ -254,6 +232,14 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     save_forward_enabled(user_id, new_status)
     
     channel_id = get_user_channel(user_id)
+    
+    if not channel_id:
+        await update.message.reply_text(
+            "❌ No channel set yet!\n\n"
+            "Please set a channel first using '📝 Set Channel' button.",
+            parse_mode="HTML"
+        )
+        return
     
     if new_status:
         text = (
@@ -269,118 +255,81 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
             "Videos will only be sent in the bot chat."
         )
     
-    # Show reply keyboard with back buttons
+    # Show reply keyboard
     reply_keyboard = get_channel_settings_reply_keyboard()
     
-    try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, parse_mode="HTML")
-        
-        await msg.reply_text(
-            "Use the buttons below to navigate:",
-            reply_markup=reply_keyboard
-        )
-        await query.answer()
-    except Exception as e:
-        logger.error(f"Error toggling forward: {e}")
+    await update.message.reply_text(
+        text,
+        reply_markup=reply_keyboard,
+        parse_mode="HTML"
+    )
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel - called from callback query"""
-    query = update.callback_query
-    user_id = query.from_user.id
+    """Remove saved channel - called from reply keyboard or callback"""
+    if update.callback_query:
+        query = update.callback_query
+        user_id = query.from_user.id
+        await query.answer()
+        msg = query.message
+    else:
+        user_id = update.message.from_user.id
+        msg = update.message
     
     current_channel = get_user_channel(user_id)
+    reply_keyboard = get_channel_settings_reply_keyboard()
     
     if not current_channel:
-        text = "❌ No channel is currently set.\n\nYou can set one by clicking 'Set Channel'."
-        
-        # Reply keyboard with Set Channel and back buttons
-        reply_keyboard = get_channel_settings_reply_keyboard()
+        text = "❌ No channel is currently set.\n\nYou can set one by clicking '📝 Set Channel' button."
         
         try:
-            msg = query.message
-            if hasattr(msg, "photo") and msg.photo:
-                await msg.edit_caption(text, parse_mode="HTML")
+            if update.callback_query:
+                if hasattr(msg, "photo") and msg.photo:
+                    await msg.edit_caption(text, parse_mode="HTML")
+                else:
+                    await msg.edit_text(text, parse_mode="HTML")
+                
+                await msg.reply_text(
+                    "Use the buttons below to navigate:",
+                    reply_markup=reply_keyboard
+                )
             else:
-                await msg.edit_text(text, parse_mode="HTML")
-            
-            await msg.reply_text(
-                "Use the buttons below to navigate:",
-                reply_markup=reply_keyboard
-            )
-            await query.answer()
+                await msg.reply_text(
+                    text,
+                    reply_markup=reply_keyboard,
+                    parse_mode="HTML"
+                )
         except Exception as e:
             logger.error(f"Error in channel_remove: {e}")
     else:
-        save_user_channel(user_id, None)  # Remove from database
-        # Also reset forward enabled to default
+        save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
+        
         text = (
             "🗑️ <b>Channel Removed</b>\n\n"
             f"Removed: <code>{current_channel}</code>\n\n"
             "You can set a new channel anytime.\n"
             "Forwarding has been reset to enabled by default."
         )
-        
-        # Show reply keyboard with back buttons
-        reply_keyboard = get_channel_settings_reply_keyboard()
         
         try:
-            msg = query.message
-            if hasattr(msg, "photo") and msg.photo:
-                await msg.edit_caption(text, parse_mode="HTML")
+            if update.callback_query:
+                if hasattr(msg, "photo") and msg.photo:
+                    await msg.edit_caption(text, parse_mode="HTML")
+                else:
+                    await msg.edit_text(text, parse_mode="HTML")
+                
+                await msg.reply_text(
+                    "Use the buttons below to navigate:",
+                    reply_markup=reply_keyboard
+                )
             else:
-                await msg.edit_text(text, parse_mode="HTML")
-            
-            await msg.reply_text(
-                "Use the buttons below to navigate:",
-                reply_markup=reply_keyboard
-            )
-            await query.answer()
+                await msg.reply_text(
+                    text,
+                    reply_markup=reply_keyboard,
+                    parse_mode="HTML"
+                )
         except Exception as e:
             logger.error(f"Error removing channel: {e}")
-    
-    logger.info(f"User {user_id} removed channel: {current_channel}")
-
-async def channel_remove_action(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel - called from reply keyboard"""
-    user_id = update.message.from_user.id
-    
-    current_channel = get_user_channel(user_id)
-    
-    if not current_channel:
-        text = "❌ No channel is currently set.\n\nYou can set one by clicking 'Set Channel'."
-        
-        # Reply keyboard with Set Channel and back buttons
-        reply_keyboard = get_channel_settings_reply_keyboard()
-        
-        await update.message.reply_text(
-            text,
-            reply_markup=reply_keyboard,
-            parse_mode="HTML"
-        )
-    else:
-        save_user_channel(user_id, None)  # Remove from database
-        # Also reset forward enabled to default
-        save_forward_enabled(user_id, True)
-        text = (
-            "🗑️ <b>Channel Removed</b>\n\n"
-            f"Removed: <code>{current_channel}</code>\n\n"
-            "You can set a new channel anytime.\n"
-            "Forwarding has been reset to enabled by default."
-        )
-        
-        # Show reply keyboard with back buttons
-        reply_keyboard = get_channel_settings_reply_keyboard()
-        
-        await update.message.reply_text(
-            text,
-            reply_markup=reply_keyboard,
-            parse_mode="HTML"
-        )
     
     logger.info(f"User {user_id} removed channel: {current_channel}")
 
@@ -409,11 +358,8 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             chat = await context.bot.get_chat(chat_id=channel_id)
             channel_name = chat.title or "Unknown Channel"
             
-            # ═══════ SAVE TO DATABASE ═══════
             save_user_channel(user_id, channel_id)
-            # By default, forward is enabled when setting new channel
             save_forward_enabled(user_id, True)
-            # ═══════════════════════════════
             
             context.user_data['awaiting_channel_id'] = False
             
@@ -422,10 +368,9 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 f"📌 <b>Channel ID:</b> <code>{channel_id}</code>\n"
                 f"📢 <b>Channel Name:</b> {channel_name}\n\n"
                 "✅ Bot will send processed videos to this channel.\n"
-                "ℹ️ You can disable forwarding from Channel Settings."
+                "ℹ️ You can disable forwarding by typing /toggle"
             )
             
-            # Show reply keyboard with back buttons
             reply_keyboard = get_channel_settings_reply_keyboard()
             
             await update.message.reply_text(
@@ -434,10 +379,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 parse_mode="HTML"
             )
             
-            # ═══════ DEBUG LOG ═══════
             logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
-            # ════════════════════════
-            
             return True
             
         except BadRequest as e:
@@ -489,15 +431,18 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
             parse_mode="HTML"
         )
 
+async def toggle_forward_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Toggle forward command - /toggle"""
+    await channel_toggle_forward(update, context)
+
 # ═══════════════════ REGISTER HANDLERS ═══════════════════
 def register_channel_handlers(app):
     """Register all channel-related handlers with the bot application"""
     
-    # Callback handlers
+    # Callback handlers - ONLY for backward compatibility
     app.add_handler(CallbackQueryHandler(show_channel_settings, pattern="^channel_settings$"))
     app.add_handler(CallbackQueryHandler(channel_set_prompt, pattern="^channel_set$"))
-    app.add_handler(CallbackQueryHandler(channel_toggle_forward, pattern="^channel_toggle_forward$"))
-    app.add_handler(CallbackQueryHandler(channel_remove, pattern="^channel_remove$"))  # <-- channel_remove name
+    app.add_handler(CallbackQueryHandler(channel_remove, pattern="^channel_remove$"))
     
     # Reply keyboard handlers
     app.add_handler(MessageHandler(
@@ -506,7 +451,7 @@ def register_channel_handlers(app):
     ))
     app.add_handler(MessageHandler(
         filters.Regex("^🗑️ Remove Channel$"), 
-        channel_remove_action
+        channel_remove
     ))
     app.add_handler(MessageHandler(
         filters.Regex("^⚙️ Back to Settings$"), 
@@ -516,6 +461,9 @@ def register_channel_handlers(app):
         filters.Regex("^⬅️ Back to Channel Settings$"), 
         handle_back_to_channel_settings
     ))
+    
+    # Toggle forward command
+    app.add_handler(CommandHandler("toggle", toggle_forward_cmd))
     
     app.add_handler(CommandHandler("cancel", cancel_channel_setup))
     
@@ -530,12 +478,10 @@ def register_channel_handlers(app):
 # ═══════════════════ REPLY KEYBOARD HANDLERS ═══════════════════
 async def handle_back_to_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle 'Back to Settings' reply keyboard button"""
-    # Import here to avoid circular import
     try:
         from settings import show_settings
         await show_settings(update, context)
     except ImportError:
-        # If settings module not found, just send a message
         await update.message.reply_text(
             "⚙️ Settings menu",
             reply_markup=ReplyKeyboardMarkup(
