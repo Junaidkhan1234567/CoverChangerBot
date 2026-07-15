@@ -27,28 +27,24 @@ def get_forward_enabled(user_id: int) -> bool:
         user_data = users_collection.find_one({"user_id": user_id})
         if user_data and "forward_enabled" in user_data:
             return user_data["forward_enabled"]
-        return True  # Default: forward enabled
+        return True
     except Exception as e:
         logger.error(f"Error getting forward enabled status: {e}")
         return True
 
 def should_forward_to_channel(user_id: int) -> bool:
-    """Alias for get_forward_enabled - checks if forwarding is enabled"""
     return get_forward_enabled(user_id)
 
 def save_user_channel(user_id: int, channel_id: str) -> None:
-    """Save user's channel ID to database"""
     try:
         users_collection = db.get_collection("users")
         if channel_id is None:
-            # Remove channel_id from user document
             users_collection.update_one(
                 {"user_id": user_id},
                 {"$unset": {"channel_id": ""}},
                 upsert=True
             )
         else:
-            # Save channel_id
             users_collection.update_one(
                 {"user_id": user_id},
                 {"$set": {"channel_id": channel_id}},
@@ -59,7 +55,6 @@ def save_user_channel(user_id: int, channel_id: str) -> None:
         logger.error(f"Error saving channel: {e}")
 
 def save_forward_enabled(user_id: int, enabled: bool) -> None:
-    """Save user's forward enabled status to database"""
     try:
         users_collection = db.get_collection("users")
         users_collection.update_one(
@@ -71,61 +66,36 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
     except Exception as e:
         logger.error(f"Error saving forward enabled status: {e}")
 
-# ═══════════════════ SEND TO CHANNEL HELPER ═══════════════════
-async def send_to_channel_if_enabled(context, user_id: int, video_file, caption: str = "", **kwargs):
-    """
-    Send video to user's channel only if forwarding is enabled.
-    Returns: (sent: bool, channel_id: str or None)
-    """
-    channel_id = get_user_channel(user_id)
-    forward_enabled = should_forward_to_channel(user_id)
-    
-    if not channel_id:
-        logger.info(f"ℹ️ No channel set for user {user_id}")
-        return False, None
-    
-    if not forward_enabled:
-        logger.info(f"ℹ️ Forwarding disabled for user {user_id}, not sending to channel")
-        return False, channel_id
-    
-    try:
-        await context.bot.send_video(
-            chat_id=channel_id,
-            video=video_file,
-            caption=caption,
-            **kwargs
-        )
-        logger.info(f"✅ Video forwarded to channel {channel_id} for user {user_id}")
-        return True, channel_id
-    except Exception as e:
-        logger.error(f"❌ Failed to forward to channel {channel_id}: {e}")
-        return False, channel_id
-
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings with 3 buttons: Toggle Forward, Remove Channel, Back"""
+    """Show channel settings - same as channel_set_prompt now"""
+    await channel_set_prompt(update, context)
+
+async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show 3 buttons: Toggle Forward, Remove Channel, Back to Settings"""
     query = update.callback_query
     user_id = query.from_user.id
     
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
     
-    # ═══════ TEXT ═══════
     text = "🔗 <b>Channel Settings</b>\n\n"
     
     if current_channel:
         text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n"
         forward_status = "✅ Enabled" if forward_enabled else "❌ Disabled"
         text += f"📤 <b>Forward to Channel:</b> {forward_status}\n\n"
+        text += "To change channel, first remove it then add new one.\n\n"
     else:
         text += "❌ <b>No channel set yet</b>\n\n"
+        text += "📝 Send me your Channel ID to set it.\n"
+        text += "Example: <code>-1001234567890</code>\n\n"
     
     text += "<b>Options:</b>\n"
     text += "📤 Toggle Forward – Enable/disable forwarding\n"
     text += "🗑️ Remove Channel – Clear current channel"
     
-    # ═══════ 3 BUTTONS ═══════
     toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
     
     keyboard = [
@@ -138,46 +108,14 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     
     keyboard_markup = InlineKeyboardMarkup(keyboard)
     
+    context.user_data['awaiting_channel_id'] = True
+    
     try:
         msg = query.message
         if hasattr(msg, "photo") and msg.photo:
             await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
         else:
             await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
-        await query.answer()
-    except Exception as e:
-        logger.error(f"Error showing channel settings: {e}")
-
-async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Prompt user to send channel ID"""
-    query = update.callback_query
-    
-    text = (
-        "📝 <b>Add Your Channel</b>\n\n"
-        "Please send me the Channel ID you want to set.\n\n"
-        "<b>How to get Channel ID:</b>\n"
-        "1️⃣ Forward any message from your channel to @getidsbot\n"
-        "2️⃣ Copy the ID (starts with -100)\n\n"
-        "Example: <code>-1001234567890</code>\n\n"
-        "⚠️ Make sure the bot is an admin in that channel!\n\n"
-        "📤 After setting, 3 options will appear:\n"
-        "• Toggle Forward (ON/OFF)\n"
-        "• Remove Channel\n"
-        "• Back to Settings"
-    )
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Back", callback_data="menu_settings")]
-    ])
-    
-    context.user_data['awaiting_channel_id'] = True
-    
-    try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
         await query.answer()
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
@@ -190,12 +128,10 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     current_forward_status = get_forward_enabled(user_id)
     new_status = not current_forward_status
     
-    # Save new status to database
     save_forward_enabled(user_id, new_status)
     
     channel_id = get_user_channel(user_id)
     
-    # ═══════ SHOW RESULT WITH 3 BUTTONS ═══════
     if new_status:
         text = (
             "✅ <b>Forwarding Enabled</b>\n\n"
@@ -210,7 +146,6 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
             "Videos will only be sent in the bot chat."
         )
     
-    # ═══════ 3 BUTTONS ═══════
     toggle_text = "📤 Forward OFF" if new_status else "📤 Forward ON"
     keyboard = InlineKeyboardMarkup([
         [
@@ -238,24 +173,28 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_channel = get_user_channel(user_id)
     
     if not current_channel:
-        text = "❌ No channel is currently set.\n\nYou can set one by clicking 'Add Your Channel' from Settings."
+        text = "❌ No channel is currently set.\n\nSend me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
+        context.user_data['awaiting_channel_id'] = True
     else:
-        save_user_channel(user_id, None)  # Remove from database
-        # Also reset forward enabled to default
+        save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
         text = (
             "🗑️ <b>Channel Removed</b>\n\n"
             f"Removed: <code>{current_channel}</code>\n\n"
-            "You can set a new channel anytime.\n"
-            "Forwarding has been reset to enabled by default."
+            "Send me your new Channel ID to set it.\n"
+            "Example: <code>-1001234567890</code>"
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("➕ Add New Channel", callback_data="channel_set")],
+            [
+                InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
+                InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+            ],
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
+        context.user_data['awaiting_channel_id'] = True
     
     try:
         msg = query.message
@@ -282,7 +221,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             "To get your channel ID:\n"
             "1️⃣ Forward any message from your channel to @getidsbot\n"
             "2️⃣ Copy the ID starting with -100\n\n"
-            "Try again or click 'Back' to exit.",
+            "Try again or click 'Back to Settings'.",
             parse_mode="HTML"
         )
         return True
@@ -292,11 +231,8 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             chat = await context.bot.get_chat(chat_id=channel_id)
             channel_name = chat.title or "Unknown Channel"
             
-            # ═══════ SAVE TO DATABASE ═══════
             save_user_channel(user_id, channel_id)
-            # By default, forward is enabled when setting new channel
             save_forward_enabled(user_id, True)
-            # ═══════════════════════════════
             
             context.user_data['awaiting_channel_id'] = False
             
@@ -308,7 +244,6 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 "ℹ️ You can disable forwarding from Channel Settings."
             )
             
-            # ═══════ 3 BUTTONS ═══════
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
@@ -331,7 +266,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                     "• The channel ID is correct\n"
                     "• The bot is an admin in the channel\n"
                     "• The channel exists\n\n"
-                    "Try again or click 'Back' to exit.",
+                    "Try again or click 'Back to Settings'.",
                     parse_mode="HTML"
                 )
             else:
@@ -339,7 +274,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                     f"❌ <b>Error</b>\n\n"
                     f"Could not verify channel: {str(e)[:100]}\n\n"
                     "Make sure the bot is an admin in the channel.\n"
-                    "Try again or click 'Back' to exit.",
+                    "Try again or click 'Back to Settings'.",
                     parse_mode="HTML"
                 )
             return True
@@ -349,7 +284,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
         await update.message.reply_text(
             f"❌ <b>Error</b>\n\n"
             f"Could not verify channel. Error: {str(e)[:100]}\n\n"
-            "Please try again or click 'Back' to exit.",
+            "Please try again or click 'Back to Settings'.",
             parse_mode="HTML"
         )
         return True
@@ -374,8 +309,6 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
 
 # ═══════════════════ REGISTER HANDLERS ═══════════════════
 def register_channel_handlers(app):
-    """Register all channel-related handlers with the bot application"""
-    
     app.add_handler(CallbackQueryHandler(show_channel_settings, pattern="^channel_settings$"))
     app.add_handler(CallbackQueryHandler(channel_set_prompt, pattern="^channel_set$"))
     app.add_handler(CallbackQueryHandler(channel_toggle_forward, pattern="^channel_toggle_forward$"))
