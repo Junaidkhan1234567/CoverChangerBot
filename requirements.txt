@@ -16,7 +16,7 @@ aiohttp==3.11.11
 pytz==2025.1
 
 # Image Processing (PIL module)
-Pillow==11.1.0
+Pillow==10.4.0
 
 # Video Processing
 moviepy==2.0.0
