@@ -1,12 +1,13 @@
 services:
   - type: worker
-    name: CoverChangerBot
-    runtime: docker
+    name: video-cover-bot
+    runtime: python
     plan: free
-    dockerfilePath: ./Dockerfile
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
-        sync: false  # Ye Render dashboard mein dalna
+        sync: false
       - key: OWNER_ID
         sync: false
       - key: MONGODB_URI
@@ -14,4 +15,8 @@ services:
       - key: FORCE_SUB_CHANNEL_ID
         sync: false
       - key: LOG_CHANNEL_ID
+        sync: false
+      - key: HOME_MENU_BANNER_URL
+        sync: false
+      - key: FORCE_SUB_BANNER_URL
         sync: false
