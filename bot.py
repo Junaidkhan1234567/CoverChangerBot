@@ -1164,37 +1164,30 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
-async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await check_force_sub(update, context):
-        return
-    user_id = update.message.from_user.id
-    thumb_status = "✅ Saved & Ready" if has_thumbnail(user_id) else "❌ Not saved yet"
-    
+elif key == "settings":
+    uid = query.from_user.id
     text = (
-        "⚙️ Your Settings\n\n"
-        "<b>Account information:</b>\n"
-        f"👤 User ID: <code>{user_id}</code>\n\n"
-        "<b>Thumbnail status:</b>\n"
-        f"{thumb_status}\n\n"
-        "<b>Management options:</b>\n"
-        "🖼️ View and manage your thumbnails"
+        "⚙️ Settings\n\n"
+        "<b>Manage your content:</b>\n\n"
+        "🖼️ <b>Thumbnail Manager</b>\n"
+        "   • View current thumbnail\n"
+        "   • Delete & update\n\n"
+        "Select options below to continue:"
     )
     settings_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_settings")],
+        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],  # ⬅️ YE CHANGE KARO
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
-    banner = HOME_MENU_BANNER_URL
-    if banner:
-        try:
-            if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(photo=InputFile(banner), caption=text, reply_markup=settings_kb, parse_mode="HTML")
-            else:
-                await update.message.reply_photo(photo=banner, caption=text, reply_markup=settings_kb, parse_mode="HTML")
-            return
-        except Exception:
-            pass
-    await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
+    try:
+        msg = query.message
+        if getattr(msg, "photo", None):
+            await msg.edit_caption(text, reply_markup=settings_kb, parse_mode="HTML")
+        else:
+            await msg.edit_text(text, reply_markup=settings_kb, parse_mode="HTML")
+    except Exception as e:
+        logger.debug(f"Settings menu edit error: {e}")
+    return
 
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
