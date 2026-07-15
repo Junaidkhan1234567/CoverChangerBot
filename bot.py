@@ -1903,6 +1903,21 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         logger.error(f"Broadcast error: {e}", exc_info=True)
 
+# bot.py mein yeh function add karo (callback_handler ke pehle)
+
+async def close_keyboard(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Close keyboard without any message"""
+    if context.user_data.get('channel_settings_active', False):
+        context.user_data['channel_settings_active'] = False
+        context.user_data['awaiting_channel_id'] = False
+        try:
+            await update.message.reply_text(
+                "",
+                reply_markup=ReplyKeyboardRemove()
+            )
+        except Exception:
+            pass
+
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
@@ -1998,6 +2013,10 @@ def main() -> None:
 
     # ═══════════════════ REGISTER CHANNEL HANDLERS ═══════════════════
     register_channel_handlers(app)
+    app.add_handler(MessageHandler(
+        filters.COMMAND,
+        close_keyboard
+    ), group=1)
     # ════════════════════════════════════════════════════════════════
 
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
