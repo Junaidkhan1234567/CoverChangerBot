@@ -406,6 +406,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     if query.data == "channel_set":
+        logger.info(f"✅ CHANNEL_SET CALLBACK TRIGGERED for user {user_id}")
         await channel_set_prompt(update, context)
         return
     
@@ -759,7 +760,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             settings_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-                [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_settings")],
+                [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
                 [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
             ])
             try:
@@ -1225,6 +1226,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=settings_kb, 
         parse_mode="HTML"
     )
+
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
