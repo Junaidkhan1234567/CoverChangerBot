@@ -67,7 +67,10 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings with 3 buttons"""
+    await channel_set_prompt(update, context)
+
+async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show 3 buttons: Toggle Forward, Remove Channel, Back to Settings"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -101,38 +104,18 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     ]
     
     keyboard_markup = InlineKeyboardMarkup(keyboard)
+    
     context.user_data['awaiting_channel_id'] = True
     
     try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(
-                caption=text,
-                reply_markup=keyboard_markup,
-                parse_mode="HTML"
-            )
-        else:
-            await msg.edit_text(
-                text,
-                reply_markup=keyboard_markup,
-                parse_mode="HTML"
-            )
+        await query.message.edit_text(
+            text, 
+            reply_markup=keyboard_markup, 
+            parse_mode="HTML"
+        )
         await query.answer()
     except Exception as e:
-        logger.error(f"Error in channel settings: {e}")
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=text,
-                reply_markup=keyboard_markup,
-                parse_mode="HTML"
-            )
-        except Exception as e2:
-            logger.error(f"Fallback also failed: {e2}")
-
-async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings with 3 buttons"""
-    await show_channel_settings(update, context)
+        logger.error(f"Error in channel set prompt: {e}")
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Toggle forward enabled/disabled"""
@@ -170,19 +153,11 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     ])
     
     try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(
-                caption=text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
-        else:
-            await msg.edit_text(
-                text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
+        await query.message.edit_text(
+            text, 
+            reply_markup=keyboard, 
+            parse_mode="HTML"
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
@@ -195,7 +170,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_channel = get_user_channel(user_id)
     
     if not current_channel:
-        text = "❌ No channel is currently set.\n\n📝 Send me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
+        text = "❌ No channel is currently set.\n\nSend me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
@@ -205,7 +180,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_forward_enabled(user_id, True)
         context.user_data['awaiting_channel_id'] = True
         
-        text = "Channel remove Successfully ✅"
+        text = "✅ Channel removed successfully!"
         
         keyboard = InlineKeyboardMarkup([
             [
@@ -216,19 +191,11 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     
     try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(
-                caption=text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
-        else:
-            await msg.edit_text(
-                text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
+        await query.message.edit_text(
+            text, 
+            reply_markup=keyboard, 
+            parse_mode="HTML"
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error removing channel: {e}")
@@ -279,7 +246,11 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
             
-            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+            await update.message.reply_text(
+                text, 
+                reply_markup=keyboard, 
+                parse_mode="HTML"
+            )
             
             logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
             
