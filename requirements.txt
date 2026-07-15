@@ -16,13 +16,13 @@ aiohttp==3.11.11
 pytz==2025.1
 
 # Image Processing (PIL module)
-Pillow==10.1.0
+Pillow==11.1.0
 
 # Video Processing
-moviepy==1.0.3
+moviepy==2.0.0
 
 # Numerical Operations
-numpy==1.24.3
+numpy==1.26.4
 
 # FFmpeg support for moviepy
 imageio-ffmpeg==0.4.9
