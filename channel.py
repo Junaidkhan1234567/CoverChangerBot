@@ -9,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 # ═══════════════════ DATABASE FUNCTIONS ═══════════════════
 def get_user_channel(user_id: int) -> str:
-    """Get user's saved channel ID from database"""
     try:
         users_collection = db.get_collection("users")
         user_data = users_collection.find_one({"user_id": user_id})
@@ -21,7 +20,6 @@ def get_user_channel(user_id: int) -> str:
         return None
 
 def get_forward_enabled(user_id: int) -> bool:
-    """Get user's forward enabled status"""
     try:
         users_collection = db.get_collection("users")
         user_data = users_collection.find_one({"user_id": user_id})
@@ -69,7 +67,6 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings - same as channel_set_prompt now"""
     await channel_set_prompt(update, context)
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -166,7 +163,7 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel"""
+    """Remove saved channel - shows simple success message"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -179,14 +176,14 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
         context.user_data['awaiting_channel_id'] = True
     else:
+        # ═══════ REMOVE CHANNEL ═══════
         save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
-        text = (
-            "🗑️ <b>Channel Removed</b>\n\n"
-            f"Removed: <code>{current_channel}</code>\n\n"
-            "Send me your new Channel ID to set it.\n"
-            "Example: <code>-1001234567890</code>"
-        )
+        context.user_data['awaiting_channel_id'] = True
+        
+        # ═══════ SIMPLE SUCCESS MESSAGE ═══════
+        text = "Channel remove Successfully ✅"
+        
         keyboard = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
@@ -194,7 +191,6 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ],
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
-        context.user_data['awaiting_channel_id'] = True
     
     try:
         msg = query.message
