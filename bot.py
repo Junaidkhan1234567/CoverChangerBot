@@ -33,6 +33,7 @@ from channel import (
     show_channel_settings,
     channel_set_prompt,
     channel_remove,
+    channel_toggle_forward,
     handle_channel_id_input,
     register_channel_handlers,
     get_user_channel,
@@ -411,6 +412,10 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if query.data == "channel_remove":
         await channel_remove(update, context)
         return
+    
+    if query.data == "channel_toggle_forward":
+        await channel_toggle_forward(update, context)
+        return
     # ════════════════════════════════════════════════════════════════
     
     if query.data == "check_fsub":
@@ -686,90 +691,119 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 logger.debug(f"Back button message edit error: {e}")
             return
         
+        if key == "help":
+            text = (
+                "ℹ️ Help Menu\n\n"
+                "<b>How to use:</b>\n\n"
+                "<b>1️⃣ Save Your Thumbnail</b>\n"
+                "   • Send any photo\n"
+                "   • Automatically saved as cover\n\n"
+                "<b>2️⃣ Apply to Videos</b>\n"
+                "   • Send any video\n"
+                "   • Thumbnail applies instantly\n\n"
+                "<b>Additional Commands:</b>\n"
+                "/remove – Delete saved thumbnail\n"
+                "/showthumbnail – View saved thumbnail\n"
+                "/settings – View & manage settings\n"
+                "/about – Information about bot"
+            )
+            back_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
+            ])
+            try:
+                msg = query.message
+                if getattr(msg, "photo", None):
+                    await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
+                else:
+                    await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
+            except Exception as e:
+                logger.debug(f"Menu edit error: {e}")
+            return
+        
+        if key == "about":
+            text = (
+                "🤖 About Cover Changer Bot\n\n"
+                "<b>What it does:</b>\n\n"
+                "✅ <b>One-Click Thumbnail</b>\n"
+                "   Send photo, apply to videos\n\n"
+                "✅ <b>Instant Processing</b>\n"
+                "   Fast cover application\n\n"
+                "✅ <b>Secure & Safe</b>\n"
+                "   Your data is protected\n\n"
+                "<b>Technology:</b>\n"
+                "⚙️ Powered by Python\n"
+                "🔒 Secure & Reliable Integration"
+            )
+            back_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
+            ])
+            try:
+                msg = query.message
+                if getattr(msg, "photo", None):
+                    await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
+                else:
+                    await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
+            except Exception as e:
+                logger.debug(f"Menu edit error: {e}")
+            return
+        
+        if key == "settings":
+            uid = query.from_user.id
+            text = (
+                "⚙️ Settings\n\n"
+                "<b>Manage your content:</b>\n\n"
+                "🖼️ <b>Thumbnail Manager</b>\n"
+                "   • View current thumbnail\n"
+                "   • Delete & update\n\n"
+                "Select options below to continue:"
+            )
+            settings_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
+                [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
+                [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
+            ])
+            try:
+                msg = query.message
+                if getattr(msg, "photo", None):
+                    await msg.edit_caption(text, reply_markup=settings_kb, parse_mode="HTML")
+                else:
+                    await msg.edit_text(text, reply_markup=settings_kb, parse_mode="HTML")
+            except Exception as e:
+                logger.debug(f"Settings menu edit error: {e}")
+            return
+        
+        if key == "developer":
+            dev_contact = f"https://t.me/{OWNER_USERNAME}" if OWNER_USERNAME else f"tg://user?id={OWNER_ID}"
+            text = (
+                "👨‍💻 <b>Developer</b>\n\n"
+                f"Contact: {dev_contact}\n"
+                "For help, support, or feedback, contact the developer."
+            )
+            back_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
+            ])
+            try:
+                msg = query.message
+                if getattr(msg, "photo", None):
+                    await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
+                else:
+                    await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
+            except Exception as e:
+                logger.debug(f"Menu edit error: {e}")
+            return
+        
+        text = "ℹ️ <b>Info</b>\n\nNo information available for this section."
+        back_kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
+        ])
         try:
-            if key == "help":
-                text = (
-                    "ℹ️ Help Menu\n\n"
-                    "<b>How to use:</b>\n\n"
-                    "<b>1️⃣ Save Your Thumbnail</b>\n"
-                    "   • Send any photo\n"
-                    "   • Automatically saved as cover\n\n"
-                    "<b>2️⃣ Apply to Videos</b>\n"
-                    "   • Send any video\n"
-                    "   • Thumbnail applies instantly\n\n"
-                    "<b>Additional Commands:</b>\n"
-                    "/remove – Delete saved thumbnail\n"
-                    "/showthumbnail – View saved thumbnail\n"
-                    "/settings – View & manage settings\n"
-                    "/about – Information about bot"
-                )
-            elif key == "about":
-                text = (
-                    "🤖 About Cover Changer Bot\n\n"
-                    "<b>What it does:</b>\n\n"
-                    "✅ <b>One-Click Thumbnail</b>\n"
-                    "   Send photo, apply to videos\n\n"
-                    "✅ <b>Instant Processing</b>\n"
-                    "   Fast cover application\n\n"
-                    "✅ <b>Secure & Safe</b>\n"
-                    "   Your data is protected\n\n"
-                    "<b>Technology:</b>\n"
-                    "⚙️ Powered by Python\n"
-                    "🔒 Secure & Reliable Integration"
-                )
-            elif key == "settings":
-                uid = query.from_user.id
-                text = (
-                    "⚙️ Settings\n\n"
-                    "<b>Manage your content:</b>\n\n"
-                    "🖼️ <b>Thumbnail Manager</b>\n"
-                    "   • View current thumbnail\n"
-                    "   • Delete & update\n\n"
-                    "Select options below to continue:"
-                )
-                settings_kb = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-                    [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_settings")],
-                    [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
-                ])
-                try:
-                    msg = query.message
-                    if getattr(msg, "photo", None):
-                        await msg.edit_caption(text, reply_markup=settings_kb, parse_mode="HTML")
-                    else:
-                        await msg.edit_text(text, reply_markup=settings_kb, parse_mode="HTML")
-                except Exception as e:
-                    logger.debug(f"Settings menu edit error: {e}")
-                return
-            elif key == "developer":
-                dev_contact = f"https://t.me/{OWNER_USERNAME}" if OWNER_USERNAME else f"tg://user?id={OWNER_ID}"
-                text = (
-                    "👨‍💻 <b>Developer</b>\n\n"
-                    f"Contact: {dev_contact}\n"
-                    "For help, support, or feedback, contact the developer."
-                )
+            msg = query.message
+            if getattr(msg, "photo", None):
+                await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
             else:
-                text = (
-                    "ℹ️ <b>Info</b>\n\n"
-                    "No information available for this section."
-                )
-            
-            if key != "settings":
-                back_kb = InlineKeyboardMarkup([
-                    [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
-                ])
-                
-                try:
-                    msg = query.message
-                    if getattr(msg, "photo", None):
-                        await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-                    else:
-                        await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-                except Exception as e:
-                    logger.debug(f"Menu edit error: {e}")
-                    await context.bot.send_message(chat_id=query.message.chat.id, text=text, reply_markup=back_kb, parse_mode="HTML")
+                await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
         except Exception as e:
-            logger.error(f"Menu error: {e}", exc_info=True)
+            logger.debug(f"Menu edit error: {e}")
         return
     
     if query.data == "submenu_thumbnails":
@@ -1164,30 +1198,37 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="HTML")
 
 
-elif key == "settings":
-    uid = query.from_user.id
+async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await check_force_sub(update, context):
+        return
+    user_id = update.message.from_user.id
+    thumb_status = "✅ Saved & Ready" if has_thumbnail(user_id) else "❌ Not saved yet"
+    
     text = (
-        "⚙️ Settings\n\n"
-        "<b>Manage your content:</b>\n\n"
-        "🖼️ <b>Thumbnail Manager</b>\n"
-        "   • View current thumbnail\n"
-        "   • Delete & update\n\n"
-        "Select options below to continue:"
+        "⚙️ Your Settings\n\n"
+        "<b>Account information:</b>\n"
+        f"👤 User ID: <code>{user_id}</code>\n\n"
+        "<b>Thumbnail status:</b>\n"
+        f"{thumb_status}\n\n"
+        "<b>Management options:</b>\n"
+        "🖼️ View and manage your thumbnails"
     )
     settings_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],  # ⬅️ YE CHANGE KARO
+        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
-    try:
-        msg = query.message
-        if getattr(msg, "photo", None):
-            await msg.edit_caption(text, reply_markup=settings_kb, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=settings_kb, parse_mode="HTML")
-    except Exception as e:
-        logger.debug(f"Settings menu edit error: {e}")
-    return
+    banner = HOME_MENU_BANNER_URL
+    if banner:
+        try:
+            if isinstance(banner, str) and os.path.isfile(banner):
+                await update.message.reply_photo(photo=InputFile(banner), caption=text, reply_markup=settings_kb, parse_mode="HTML")
+            else:
+                await update.message.reply_photo(photo=banner, caption=text, reply_markup=settings_kb, parse_mode="HTML")
+            return
+        except Exception:
+            pass
+    await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
 
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
