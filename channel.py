@@ -70,28 +70,21 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     await channel_set_prompt(update, context)
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show 3 buttons: Toggle Forward, Remove Channel, Back to Settings"""
+    """Show message with buttons: Toggle Forward, Remove Channel, Back to Settings"""
     query = update.callback_query
     user_id = query.from_user.id
+    
+    # ✅ PEHLE OLD MESSAGE DELETE KARO
+    try:
+        await query.message.delete()
+    except Exception as e:
+        logger.warning(f"Could not delete old message: {e}")
     
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
     
-    text = "🔗 <b>Channel Settings</b>\n\n"
-    
-    if current_channel:
-        text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n"
-        forward_status = "✅ Enabled" if forward_enabled else "❌ Disabled"
-        text += f"📤 <b>Forward to Channel:</b> {forward_status}\n\n"
-        text += "To change channel, first remove it then add new one.\n\n"
-    else:
-        text += "❌ <b>No channel set yet</b>\n\n"
-        text += "📝 Send me your Channel ID to set it.\n"
-        text += "Example: <code>-1001234567890</code>\n\n"
-    
-    text += "<b>Options:</b>\n"
-    text += "📤 Toggle Forward – Enable/disable forwarding\n"
-    text += "🗑️ Remove Channel – Clear current channel"
+    # ✅ SIRF SIMPLE TEXT MESSAGE
+    text = "👇 <b>Click below button to manage your channel</b>"
     
     toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
     
@@ -108,12 +101,15 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data['awaiting_channel_id'] = True
     
     try:
-        await query.message.edit_text(
-            text, 
-            reply_markup=keyboard_markup, 
+        # ✅ NAYA MESSAGE BHEJO SIRF TEXT KE SATH
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard_markup,
             parse_mode="HTML"
         )
         await query.answer()
+        logger.info(f"✅ Channel settings message sent to user {user_id}")
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
 
@@ -129,18 +125,21 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     
     channel_id = get_user_channel(user_id)
     
+    # ✅ SIRF SIMPLE TEXT MESSAGE
     if new_status:
         text = (
             "✅ <b>Forwarding Enabled</b>\n\n"
             f"📌 <b>Channel:</b> <code>{channel_id}</code>\n\n"
-            "Bot will now forward processed videos to your channel."
+            "Bot will now forward processed videos to your channel.\n\n"
+            "👇 <b>Click below to manage your channel</b>"
         )
     else:
         text = (
             "❌ <b>Forwarding Disabled</b>\n\n"
             f"📌 <b>Channel:</b> <code>{channel_id}</code>\n\n"
             "Bot will <b>NOT</b> forward videos to your channel.\n"
-            "Videos will only be sent in the bot chat."
+            "Videos will only be sent in the bot chat.\n\n"
+            "👇 <b>Click below to manage your channel</b>"
         )
     
     toggle_text = "📤 Forward OFF" if new_status else "📤 Forward ON"
@@ -153,9 +152,16 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     ])
     
     try:
-        await query.message.edit_text(
-            text, 
-            reply_markup=keyboard, 
+        # ✅ OLD MESSAGE DELETE KARO AUR NAYA BHEJO
+        try:
+            await query.message.delete()
+        except Exception:
+            pass
+        
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
             parse_mode="HTML"
         )
         await query.answer()
@@ -169,6 +175,12 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     current_channel = get_user_channel(user_id)
     
+    # ✅ OLD MESSAGE DELETE KARO
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    
     if not current_channel:
         text = "❌ No channel is currently set.\n\nSend me your Channel ID to set it.\nExample: <code>-1001234567890</code>"
         keyboard = InlineKeyboardMarkup([
@@ -180,7 +192,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_forward_enabled(user_id, True)
         context.user_data['awaiting_channel_id'] = True
         
-        text = "✅ Channel removed successfully!"
+        text = "✅ Channel removed successfully!\n\n👇 <b>Click below to manage your channel</b>"
         
         keyboard = InlineKeyboardMarkup([
             [
@@ -191,9 +203,11 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     
     try:
-        await query.message.edit_text(
-            text, 
-            reply_markup=keyboard, 
+        # ✅ NAYA MESSAGE BHEJO
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
             parse_mode="HTML"
         )
         await query.answer()
@@ -235,7 +249,8 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 f"📌 <b>Channel ID:</b> <code>{channel_id}</code>\n"
                 f"📢 <b>Channel Name:</b> {channel_name}\n\n"
                 "✅ Bot will send processed videos to this channel.\n"
-                "ℹ️ You can disable forwarding from Channel Settings."
+                "ℹ️ You can disable forwarding from Channel Settings.\n\n"
+                "👇 <b>Click below to manage your channel</b>"
             )
             
             keyboard = InlineKeyboardMarkup([
