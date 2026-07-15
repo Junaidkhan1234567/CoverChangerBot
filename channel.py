@@ -64,18 +64,6 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
     except Exception as e:
         logger.error(f"Error saving forward enabled status: {e}")
 
-# ═══════════════════ MIDDLEWARE - KEYBOARD REMOVE ═══════════════════
-async def remove_keyboard_after_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Har command ke baad keyboard remove karne ke liye - WITHOUT ANY MESSAGE"""
-    user_id = update.message.from_user.id
-    
-    # ✅ CHANNEL SETTINGS ACTIVE FLAG FALSE KARO
-    context.user_data['channel_settings_active'] = False
-    context.user_data['awaiting_channel_id'] = False
-    
-    # ✅ KEYBOARD REMOVE KARO - BINA MESSAGE KE
-    # Note: ReplyKeyboardRemove directly command response mein use hoga
-
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
