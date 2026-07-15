@@ -668,10 +668,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 "<b>Quick Start Guide:</b>\n\n"
                 "📸 <b>Step 1:</b> Send a photo as thumbnail\n"
                 "🎥 <b>Step 2:</b> Send a video to apply cover\n\n"
-                "<b>Navigation:</b>\n"
-                "❓ /help – Usage guide\n"
-                "⚙️ /settings – Manage thumbnails\n"
-                "ℹ️ /about – Bot information"
             )
             kb_rows = [
                 [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
@@ -1185,6 +1181,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
     settings_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
+        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_settings")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
     banner = HOME_MENU_BANNER_URL
