@@ -207,7 +207,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not current_channel:
         text = "❌ <b>No channel is currently set.</b>\n\n"
         text += "📝 Send me your Channel ID to set it.\n"
-        text += "Example: <code>-1001234567890</code>\n\n"
+        text += "Example: <code>-100123456789</code>\n\n"
         text += "ℹ️ To get your channel ID:\n"
         text += "1️⃣ Forward any message from your channel to @getidsbot\n"
         text += "2️⃣ Copy the ID starting with -100\n\n"
@@ -230,12 +230,6 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_forward_enabled(user_id, True)
         
         text = "✅ <b>Channel removed successfully!</b>\n\n"
-        text += "📝 Send me a new Channel ID to set it.\n"
-        text += "Example: <code>-1001234567890</code>\n\n"
-        text += "ℹ️ To get your channel ID:\n"
-        text += "1️⃣ Forward any message from your channel to @getidsbot\n"
-        text += "2️⃣ Copy the ID starting with -100\n\n"
-        text += "⚠️ Make sure bot is admin in your channel!"
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
