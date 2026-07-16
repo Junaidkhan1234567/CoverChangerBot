@@ -70,7 +70,7 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     await channel_set_prompt(update, context)
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show text prompt with Back button to send channel ID"""
+    """Show channel settings with current status and buttons"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -83,11 +83,14 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     await query.answer()
     
     current_channel = get_user_channel(user_id)
+    forward_enabled = get_forward_enabled(user_id)
     
     text = "🔗 <b>Channel Settings</b>\n\n"
     
     if current_channel:
-        text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n\n"
+        text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n"
+        forward_status = "✅ Enabled" if forward_enabled else "❌ Disabled"
+        text += f"📤 <b>Forward to Channel:</b> {forward_status}\n\n"
         text += "To change channel, send new Channel ID.\n\n"
     else:
         text += "❌ <b>No channel set yet</b>\n\n"
@@ -99,10 +102,11 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text += "2️⃣ Copy the ID starting with -100\n\n"
     text += "⚠️ Make sure bot is admin in your channel!"
     
-    # ✅ BACK TO SETTINGS BUTTON
+    # ✅ BUTTONS
+    toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
+            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
             InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
         ],
         [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
@@ -121,7 +125,7 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.error(f"Error in channel set prompt: {e}")
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Toggle forward enabled/disabled"""
+    """Toggle forward enabled/disabled - SIRF TOGGLE, KOI MESSAGE NAHI"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -136,37 +140,13 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     current_forward_status = get_forward_enabled(user_id)
     new_status = not current_forward_status
     
+    # ✅ DATABASE MEIN TOGGLE KARO
     save_forward_enabled(user_id, new_status)
     
-    channel_id = get_user_channel(user_id)
+    logger.info(f"✅ Forward toggled for user {user_id}: {'ON' if new_status else 'OFF'}")
     
-    if new_status:
-        text = (
-            "✅ <b>Forwarding Enabled</b>\n\n"
-            f"📌 <b>Channel:</b> <code>{channel_id}</code>\n\n"
-            "Bot will now forward processed videos to your channel."
-        )
-    else:
-        text = (
-            "❌ <b>Forwarding Disabled</b>\n\n"
-            f"📌 <b>Channel:</b> <code>{channel_id}</code>\n\n"
-            "Bot will <b>NOT</b> forward videos to your channel.\n"
-            "Videos will only be sent in the bot chat."
-        )
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-    ])
-    
-    try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=text,
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-    except Exception as e:
-        logger.error(f"Error toggling forward: {e}")
+    # ✅ CHANNEL SETTINGS PHIR SE SHOW KARO (WITH UPDATED STATUS)
+    await channel_set_prompt(update, context)
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Remove saved channel - show prompt with Back button"""
@@ -264,6 +244,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             
             context.user_data['awaiting_channel_id'] = False
             
+            # ✅ CHANNEL SET SUCCESS - BUTTONS KE SAATH
             text = (
                 "✅ <b>Channel Set Successfully!</b>\n\n"
                 f"📌 <b>Channel ID:</b> <code>{channel_id}</code>\n"
@@ -272,8 +253,12 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 "ℹ️ You can manage from Settings menu."
             )
             
-            # ✅ BUTTONS WITH BACK TO SETTINGS
+            # ✅ FORWARD TOGGLE AUR REMOVE BUTTONS
             keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
+                    InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+                ],
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
             
