@@ -74,13 +74,9 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     user_id = query.from_user.id
     
-    # ✅ OLD MESSAGE DELETE KARO
-    try:
-        await query.message.delete()
-    except Exception:
-        pass
-    
-    await query.answer()
+    # ✅ AGAR CALLBACK HAI TOH MESSAGE EDIT KARO, DELETE NAHI
+    if query:
+        await query.answer()
     
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
@@ -115,25 +111,27 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data['awaiting_channel_id'] = True
     
     try:
-        await context.bot.send_message(
-            chat_id=user_id,
-            text=text,
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
+        # ✅ AGAR QUERY HAI TOH EDIT KARO, NAHI TOH NAYA MESSAGE
+        if query and query.message:
+            await query.message.edit_text(
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Toggle forward enabled/disabled - SIRF TOGGLE, KOI MESSAGE NAHI"""
+    """Toggle forward enabled/disabled - SIRF BUTTON CHANGE, KOI NAYA MESSAGE NAHI"""
     query = update.callback_query
     user_id = query.from_user.id
-    
-    # ✅ OLD MESSAGE DELETE KARO
-    try:
-        await query.message.delete()
-    except Exception:
-        pass
     
     await query.answer()
     
@@ -145,19 +143,50 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     
     logger.info(f"✅ Forward toggled for user {user_id}: {'ON' if new_status else 'OFF'}")
     
-    # ✅ CHANNEL SETTINGS PHIR SE SHOW KARO (WITH UPDATED STATUS)
-    await channel_set_prompt(update, context)
+    # ✅ CURRENT MESSAGE EDIT KARO - SIRF BUTTON CHANGE
+    current_channel = get_user_channel(user_id)
+    
+    text = "🔗 <b>Channel Settings</b>\n\n"
+    
+    if current_channel:
+        text += f"📌 <b>Current Channel:</b> <code>{current_channel}</code>\n"
+        forward_status = "✅ Enabled" if new_status else "❌ Disabled"
+        text += f"📤 <b>Forward to Channel:</b> {forward_status}\n\n"
+        text += "To change channel, send new Channel ID.\n\n"
+    else:
+        text += "❌ <b>No channel set yet</b>\n\n"
+    
+    text += "📝 <b>Send me your Channel ID to set it.</b>\n"
+    text += "Example: <code>-1001234567890</code>\n\n"
+    text += "ℹ️ To get your channel ID:\n"
+    text += "1️⃣ Forward any message from your channel to @getidsbot\n"
+    text += "2️⃣ Copy the ID starting with -100\n\n"
+    text += "⚠️ Make sure bot is admin in your channel!"
+    
+    # ✅ BUTTONS - TOGGLE TEXT CHANGE
+    toggle_text = "📤 Forward OFF" if new_status else "📤 Forward ON"
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
+            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+        ],
+        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+    ])
+    
+    try:
+        # ✅ SAME MESSAGE EDIT KARO - DELETE + NEW MESSAGE NAHI
+        await query.message.edit_text(
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+    except Exception as e:
+        logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Remove saved channel - show prompt with Back button"""
     query = update.callback_query
     user_id = query.from_user.id
-    
-    # ✅ OLD MESSAGE DELETE KARO
-    try:
-        await query.message.delete()
-    except Exception:
-        pass
     
     await query.answer()
     
@@ -179,8 +208,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
         
-        await context.bot.send_message(
-            chat_id=user_id,
+        await query.message.edit_text(
             text=text,
             reply_markup=keyboard,
             parse_mode="HTML"
@@ -204,8 +232,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
         
-        await context.bot.send_message(
-            chat_id=user_id,
+        await query.message.edit_text(
             text=text,
             reply_markup=keyboard,
             parse_mode="HTML"
