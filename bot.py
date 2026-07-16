@@ -73,7 +73,7 @@ def get_ist_datetime_str():
     """Returns current IST datetime as formatted string"""
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
-    return now.strftime("%I:%M:%S %p IST")
+    return now.strftime("%I:%M:%S %p")
 
 # Logging
 logging.basicConfig(
