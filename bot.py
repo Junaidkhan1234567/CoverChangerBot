@@ -154,28 +154,13 @@ async def send_or_edit(update: Update, text, reply_markup=None, force_banner=Non
         except BadRequest:
             pass
     else:
-        if force_banner:
-            try:
-                if isinstance(force_banner, str) and os.path.isfile(force_banner):
-                    photo = InputFile(force_banner)
-                else:
-                    photo = force_banner
-            except Exception:
-                photo = force_banner
-
-            await update.message.reply_photo(
-                photo=photo,
-                caption=text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-            )
-        else:
-            await update.message.reply_text(
-                text,
-                reply_markup=reply_markup,
-                parse_mode="HTML",
-                disable_web_page_preview=True,
-            )
+        # ✅ BANNER IGNORE KARO - SIRF TEXT
+        await update.message.reply_text(
+            text,
+            reply_markup=reply_markup,
+            parse_mode="HTML",
+            disable_web_page_preview=True,
+        )
 
 
 async def get_invite_link(bot, chat_id):
@@ -926,6 +911,41 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             pass
         return
     
+    # ✅ MENU_BACK - BANNER HATAYA, SIRF TEXT
+    if query.data == "menu_back":
+        await query.answer()
+        user_id = query.from_user.id
+        
+        text = (
+            "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+            "• Send/forward Image → Save cover\n"
+            "• Send/forward video → Apply cover\n"
+            "• /showthumbnail → View cover\n\n"
+            "📊 The bot never offline unless maintenance or admin intervention."
+        )
+        
+        kb_rows = [
+            [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
+             InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
+            [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings"),
+             InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
+        ]
+        
+        if is_admin(user_id):
+            kb_rows.append([InlineKeyboardButton("🛠️ Admin Panel", callback_data="admin_back")])
+        
+        kb = InlineKeyboardMarkup(kb_rows)
+        
+        try:
+            msg = query.message
+            if getattr(msg, "photo", None):
+                await msg.edit_caption(text, reply_markup=kb, parse_mode="HTML")
+            else:
+                await msg.edit_text(text, reply_markup=kb, parse_mode="HTML")
+        except Exception as e:
+            logger.debug(f"Menu back error: {e}")
+        return
+    
     logger.warning(f"⚠️ Unknown callback: {query.data}")
     try:
         await query.answer("Unknown action", show_alert=False)
@@ -937,12 +957,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (
-    "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-    "• Send/forward Image → Save cover\n"
-    "• Send/forward video → Apply cover\n"
-    "• /showthumbnail → View cover\n\n"
-    "📊 The bot never offline unless maintenance or admin intervention."
-)
+        "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+        "• Send/forward Image → Save cover\n"
+        "• Send/forward video → Apply cover\n"
+        "• /showthumbnail → View cover\n\n"
+        "📊 The bot never offline unless maintenance or admin intervention."
+    )
 
     kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
@@ -951,8 +971,6 @@ async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
          InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
     ])
     
-    home_banner = HOME_MENU_BANNER_URL
-
     if update.callback_query:
         msg = update.callback_query.message
         try:
@@ -960,35 +978,13 @@ async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await msg.delete()
             except Exception:
                 pass            
-            if home_banner:
-                try:
-                    if isinstance(home_banner, str) and os.path.isfile(home_banner):
-                        photo = InputFile(home_banner)
-                    else:
-                        photo = home_banner
-                    
-                    await context.bot.send_photo(
-                        chat_id=msg.chat.id,
-                        photo=photo,
-                        caption=text,
-                        reply_markup=kb,
-                        parse_mode="HTML"
-                    )
-                except Exception as banner_err:
-                    logger.warning(f"Could not send home banner: {banner_err}")
-                    await context.bot.send_message(
-                        chat_id=msg.chat.id,
-                        text=text,
-                        reply_markup=kb,
-                        parse_mode="HTML"
-                    )
-            else:
-                await context.bot.send_message(
-                    chat_id=msg.chat.id,
-                    text=text,
-                    reply_markup=kb,
-                    parse_mode="HTML"
-                )
+            # ✅ BANNER HATAYA - SIRF TEXT
+            await context.bot.send_message(
+                chat_id=msg.chat.id,
+                text=text,
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
         except Exception as e:
             logger.warning(f"Error sending home menu: {e}")
             try:
@@ -1001,15 +997,7 @@ async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception:
                 pass
     else:
-        if home_banner:
-            try:
-                if isinstance(home_banner, str) and os.path.isfile(home_banner):
-                    await update.message.reply_photo(photo=InputFile(home_banner), caption=text, reply_markup=kb, parse_mode="HTML")
-                else:
-                    await update.message.reply_photo(photo=home_banner, caption=text, reply_markup=kb, parse_mode="HTML")
-                return
-            except Exception as e:
-                logger.warning(f"Could not send home banner: {e}")
+        # ✅ BANNER HATAYA - SIRF TEXT
         await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
 
 
@@ -1018,12 +1006,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     first_name = update.effective_user.first_name or "User"
     
-    # ✅ CHECK: KYA USER PEHLE SE EXISTS KARTA HAI?
     user_check = get_thumbnail(user_id)
     is_new_user = user_check is None
     
     if is_new_user:
-        # ✅ SIRF NAYE USER KA LOG
         try:
             await log_user_start(
                 context.bot,
@@ -1042,17 +1028,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         logger.info(f"👋 Returning user: {user_id} (no log sent)")
     
-    # Check if user is banned
     if is_user_banned(user_id):
         await update.message.reply_text("🚫 Access denied\n\nYour account has been restricted. Contact support.", parse_mode="HTML")
         return
     
-    # Check force-sub first
     if not await check_force_sub(update, context):
         logger.warning(f"❌ User {user_id} blocked by force-sub check")
         return
     
-    # Welcome message
     text = (
         "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
         "• Send/forward Image → Save cover\n"
@@ -1061,7 +1044,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📊 The bot never offline unless maintenance or admin intervention."
     )
     
-    # Build keyboard
     kb_rows = [
         [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
          InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
@@ -1073,8 +1055,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         kb_rows.append([InlineKeyboardButton("🛠️ Admin Panel", callback_data="admin_back")])
     
     kb = InlineKeyboardMarkup(kb_rows)
-    banner = HOME_MENU_BANNER_URL
     
+    # ✅ SIRF START COMMAND PAR BANNER
+    banner = HOME_MENU_BANNER_URL
     if banner:
         try:
             if isinstance(banner, str) and os.path.isfile(banner):
@@ -1153,16 +1136,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✓ Keep your covers fresh\n\n"
         "📞 Need help? Contact: /about"
     )
-    banner = HOME_MENU_BANNER_URL
-    if banner:
-        try:
-            if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(photo=InputFile(banner), caption=text, parse_mode="HTML")
-            else:
-                await update.message.reply_photo(photo=banner, caption=text, parse_mode="HTML")
-            return
-        except Exception:
-            pass
+    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, parse_mode="HTML")
 
 
@@ -1185,16 +1159,7 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📧 For help: /about → Developer\n\n"
         "Thank you for using this bot! 🎬"
     )
-    banner = HOME_MENU_BANNER_URL
-    if banner:
-        try:
-            if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(photo=InputFile(banner), caption=text, parse_mode="HTML")
-            else:
-                await update.message.reply_photo(photo=banner, caption=text, parse_mode="HTML")
-            return
-        except Exception:
-            pass
+    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, parse_mode="HTML")
 
 
@@ -1218,16 +1183,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
-    banner = HOME_MENU_BANNER_URL
-    if banner:
-        try:
-            if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(photo=InputFile(banner), caption=text, reply_markup=settings_kb, parse_mode="HTML")
-            else:
-                await update.message.reply_photo(photo=banner, caption=text, reply_markup=settings_kb, parse_mode="HTML")
-            return
-        except Exception:
-            pass
+    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
 
 
@@ -1323,14 +1279,11 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     clean_caption = re.sub(url_pattern, '', original_caption).strip()
     clean_caption = ' '.join(clean_caption.split())
     
-    # ═══════ CHECK CHANNEL AND FORWARD STATUS ═══════
     saved_channel = get_user_channel(user_id)
     forward_enabled = should_forward_to_channel(user_id)
     
     logger.info(f"📌 User {user_id} - Channel: {saved_channel}, Forward Enabled: {forward_enabled}")
-    # ══════════════════════════════════════════════════
     
-    # ═══════ USER KO VIDEO SEND (with cover) ═══════
     media = InputMediaVideo(
         media=video, 
         caption=clean_caption,
@@ -1346,10 +1299,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         logger.info(f"✅ Video sent to user {user_id} with cover")
         
-        # ═══════ CHANNEL KO VIDEO SEND (ONLY IF ENABLED) ═══════
         if saved_channel and forward_enabled:
             try:
-                # Channel ke liye InputMediaVideo
                 channel_media = InputMediaVideo(
                     media=video,
                     caption=f" {clean_caption or 'No caption'}",
@@ -1371,7 +1322,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 logger.error(f"❌ Error sending video to channel: {e}")
                 
-                # Retry: Bina cover ke send
                 try:
                     await context.bot.send_video(
                         chat_id=saved_channel,
@@ -1394,7 +1344,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         parse_mode="HTML"
                     )
         elif saved_channel and not forward_enabled:
-            # ═══════ FORWARDING DISABLED - SIRF LOG ═══════
             logger.info(f"ℹ️ Forwarding disabled for user {user_id}, not sending to channel")
             await update.message.reply_text(
                 f"ℹ️ Forward OFF\n",
@@ -1402,9 +1351,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
         elif not saved_channel:
             logger.info(f"ℹ️ No channel set for user {user_id}")
-        # ════════════════════════════════════════════════════════
         
-        # ═══════ LOG CHANNEL ═══════
         if LOG_CHANNEL_ID:
             try:
                 log_caption = (
@@ -1511,28 +1458,7 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")],
     ])
     
-    banner = HOME_MENU_BANNER_URL
-    
-    if banner:
-        try:
-            if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(
-                    photo=InputFile(banner),
-                    caption=text,
-                    reply_markup=admin_kb,
-                    parse_mode="HTML"
-                )
-            else:
-                await update.message.reply_photo(
-                    photo=banner,
-                    caption=text,
-                    reply_markup=admin_kb,
-                    parse_mode="HTML"
-                )
-            return
-        except Exception as e:
-            logger.warning(f"Could not send admin menu banner: {e}")
-    
+    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, reply_markup=admin_kb, parse_mode="HTML")
 
 
@@ -1738,12 +1664,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
     
-    # ═══════════════════ CHECK CHANNEL ID INPUT ═══════════════════
     if await handle_channel_id_input(update, context):
         return
-    # ════════════════════════════════════════════════════════════
     
-    # Handle other text inputs
     await update.message.reply_text("❓ Unknown command. Use /help for assistance.")
 
 
@@ -1771,7 +1694,6 @@ async def post_init(app: Application):
         except Exception as e:
             logger.error(f"❌ Failed to send deploy log: {e}")
     
-    # Setup bot commands
     try:
         from telegram import BotCommand
         commands = [
@@ -1802,12 +1724,9 @@ def main() -> None:
 
     app.add_error_handler(error_handler)
     
-    # ✅ POST_INIT - Deploy log ke liye
     app.post_init = post_init
 
-    # ═══════════════════ REGISTER CHANNEL HANDLERS ═══════════════════
     register_channel_handlers(app)
-    # ════════════════════════════════════════════════════════════════
 
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
