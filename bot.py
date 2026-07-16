@@ -154,7 +154,6 @@ async def send_or_edit(update: Update, text, reply_markup=None, force_banner=Non
         except BadRequest:
             pass
     else:
-        # ✅ BANNER IGNORE KARO - SIRF TEXT
         await update.message.reply_text(
             text,
             reply_markup=reply_markup,
@@ -371,6 +370,57 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return True
 
 
+async def send_home_menu(context, chat_id: int, user_id: int = None):
+    """Helper function to send home menu with banner"""
+    text = (
+        "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
+        "• Send/forward Image → Save cover\n"
+        "• Send/forward video → Apply cover\n"
+        "• /showthumbnail → View cover\n\n"
+        "📊 The bot never offline unless maintenance or admin intervention."
+    )
+    
+    kb_rows = [
+        [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
+         InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
+        [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings"),
+         InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
+    ]
+    
+    if user_id and is_admin(user_id):
+        kb_rows.append([InlineKeyboardButton("🛠️ Admin Panel", callback_data="admin_back")])
+    
+    kb = InlineKeyboardMarkup(kb_rows)
+    banner = HOME_MENU_BANNER_URL
+    
+    if banner:
+        try:
+            if isinstance(banner, str) and os.path.isfile(banner):
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=InputFile(banner),
+                    caption=text,
+                    reply_markup=kb,
+                    parse_mode="HTML"
+                )
+            else:
+                await context.bot.send_photo(
+                    chat_id=chat_id,
+                    photo=banner,
+                    caption=text,
+                    reply_markup=kb,
+                    parse_mode="HTML"
+                )
+            return
+        except Exception as e:
+            logger.warning(f"Could not send banner: {e}")
+    
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=text,
+        reply_markup=kb,
+        parse_mode="HTML"
+    )
 
 
 async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -403,13 +453,21 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     # ════════════════════════════════════════════════════════════════
     
+    # ✅ OLD MESSAGE DELETE KARO
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    
+    await query.answer()
+    
     if query.data == "check_fsub":
         logger.info(f"🔍 Verify button clicked by user {user_id}")
         
         if not FORCE_SUB_CHANNEL_ID:
             logger.warning("⚠️ FORCE_SUB_CHANNEL_ID not configured")
             await query.answer("✅ Bot configured successfully!", show_alert=False)
-            await open_home(update, context)
+            await send_home_menu(context, user_id, user_id)
             return
         
         try:
@@ -445,17 +503,8 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             ):
                 verified_users.add(user_id)
                 logger.info(f"✅ User {user_id} verified successfully with status {member.status}")
-                
                 await query.answer("✅ Channel verified successfully!", show_alert=False)
-                
-                try:
-                    await query.message.delete()
-                    logger.info(f"🗑️ Verification message deleted")
-                except Exception as del_error:
-                    logger.warning(f"Could not delete message: {del_error}")
-                
-                logger.info(f"🏠 Showing home screen for user {user_id}")
-                await open_home(update, context)
+                await send_home_menu(context, user_id, user_id)
                 return
             
             logger.warning(f"⚠️ User {user_id} not a member. Status: {member.status}")
@@ -469,22 +518,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if query.data == "close_banner":
         logger.info(f"❌ User {user_id} closed banner")
-        try:
-            await query.answer()
-            await query.message.delete()
-        except Exception as e:
-            logger.error(f"Close error: {e}")
-            try:
-                await query.message.edit_text("Closed", parse_mode="HTML")
-            except Exception:
-                pass
         return
     
     if query.data == "admin_stats":
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
             return
-        await query.answer()
         stats = get_stats()
         text = (
             "📊 Bot Statistics\n\n"
@@ -495,21 +534,18 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_back")]
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return
     
     if query.data == "admin_users":
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
             return
-        await query.answer()
         stats = get_stats()
         total_users = stats['total_users']
         banned_users = stats['banned_users']
@@ -525,21 +561,18 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_back")]
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return
     
     if query.data == "admin_status":
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
             return
-        await query.answer()
         try:
             import psutil
             import time
@@ -558,21 +591,18 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_back")]
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return
     
     if query.data == "admin_ban":
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
             return
-        await query.answer()
         text = "🚫 Ban User\n\nSend /ban <user_id> <reason> to ban a user"
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_back")]
@@ -584,7 +614,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
             return
-        await query.answer()
         text = "✅ Unban User\n\nSend /unban <user_id> to unban a user"
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_back")]
@@ -596,7 +625,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
             return
-        await query.answer()
         text = "📢 Broadcast Message\n\nSend /broadcast <message> to send to all users"
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="admin_back")]
@@ -608,7 +636,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user_id):
             await query.answer("❌ Unauthorized", show_alert=True)
             return
-        await query.answer()
         text = (
             "🛠️ Admin Control Panel\n\n"
             "<b>Management Options:</b>\n\n"
@@ -625,32 +652,25 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("📢 Broadcast", callback_data="admin_broadcast"),
              InlineKeyboardButton("⬅️ Back", callback_data="menu_back")],
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=admin_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=admin_kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=admin_kb,
+            parse_mode="HTML"
+        )
         return
 
     if query.data == "contact_owner":
         logger.info(f"📞 Contact owner for user {user_id}")
-        try:
-            await query.answer()
-            if OWNER_USERNAME:
-                await context.bot.send_message(chat_id=query.message.chat_id, text=f"Contact owner: https://t.me/{OWNER_USERNAME}")
-            else:
-                await context.bot.send_message(chat_id=query.message.chat_id, text="Owner contact not configured.")
-        except Exception as e:
-            logger.error(f"Contact error: {e}")
+        if OWNER_USERNAME:
+            await context.bot.send_message(chat_id=user_id, text=f"Contact owner: https://t.me/{OWNER_USERNAME}")
+        else:
+            await context.bot.send_message(chat_id=user_id, text="Owner contact not configured.")
         return
 
     if query.data.startswith("menu_"):
         key = query.data.split("menu_")[1]
         logger.info(f"📋 Menu callback: {key} for user {user_id}")
-        await query.answer()
         
         if key == "back":
             text = (
@@ -666,14 +686,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                  InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
             ]
             kb = InlineKeyboardMarkup(kb_rows)
-            try:
-                msg = query.message
-                if getattr(msg, "photo", None):
-                    await msg.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-                else:
-                    await msg.edit_text(text, reply_markup=kb, parse_mode="HTML")
-            except Exception as e:
-                logger.debug(f"Back button message edit error: {e}")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=kb,
+                parse_mode="HTML"
+            )
             return
         
         if key == "help":
@@ -695,14 +713,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             back_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
             ])
-            try:
-                msg = query.message
-                if getattr(msg, "photo", None):
-                    await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-                else:
-                    await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-            except Exception as e:
-                logger.debug(f"Menu edit error: {e}")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=back_kb,
+                parse_mode="HTML"
+            )
             return
         
         if key == "about":
@@ -722,18 +738,15 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             back_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
             ])
-            try:
-                msg = query.message
-                if getattr(msg, "photo", None):
-                    await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-                else:
-                    await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-            except Exception as e:
-                logger.debug(f"Menu edit error: {e}")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=back_kb,
+                parse_mode="HTML"
+            )
             return
         
         if key == "settings":
-            uid = query.from_user.id
             text = (
                 "⚙️ Settings\n\n"
                 "<b>Manage your content:</b>\n\n"
@@ -747,14 +760,12 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
                 [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
             ])
-            try:
-                msg = query.message
-                if getattr(msg, "photo", None):
-                    await msg.edit_caption(text, reply_markup=settings_kb, parse_mode="HTML")
-                else:
-                    await msg.edit_text(text, reply_markup=settings_kb, parse_mode="HTML")
-            except Exception as e:
-                logger.debug(f"Settings menu edit error: {e}")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=settings_kb,
+                parse_mode="HTML"
+            )
             return
         
         if key == "developer":
@@ -767,34 +778,28 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             back_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
             ])
-            try:
-                msg = query.message
-                if getattr(msg, "photo", None):
-                    await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-                else:
-                    await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-            except Exception as e:
-                logger.debug(f"Menu edit error: {e}")
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=back_kb,
+                parse_mode="HTML"
+            )
             return
         
         text = "ℹ️ <b>Info</b>\n\nNo information available for this section."
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-        except Exception as e:
-            logger.debug(f"Menu edit error: {e}")
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return
     
     if query.data == "submenu_thumbnails":
-        await query.answer()
-        uid = query.from_user.id
-        thumb_status = "✅ Saved" if has_thumbnail(uid) else "❌ Not saved"
+        thumb_status = "✅ Saved" if has_thumbnail(user_id) else "❌ Not saved"
         text = (
             "🖼️ <b>Thumbnail Manager</b>\n\n"
             f"<b>Current status:</b> {thumb_status}\n\n"
@@ -812,18 +817,15 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("🗑️ Delete Thumbnail", callback_data="thumb_delete"),
              InlineKeyboardButton("⬅️ Back", callback_data="menu_settings")]
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=thumb_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=thumb_kb, parse_mode="HTML")
-        except Exception as e:
-            logger.debug(f"Thumbnails submenu edit error: {e}")
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=thumb_kb,
+            parse_mode="HTML"
+        )
         return
     
     if query.data == "thumb_save_info":
-        await query.answer()
         text = (
             "💾 Save Your Thumbnail\n\n"
             "📸 How it works:\n\n"
@@ -845,28 +847,21 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="submenu_thumbnails")]
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return
     
     if query.data == "thumb_show":
-        await query.answer()
         photo_id = get_thumbnail(user_id)
         if photo_id:
             text = "👁️ Your current thumbnail\n\nThis photo will be applied to your videos\nChange it by sending a new photo"
             back_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("⬅️ Back", callback_data="submenu_thumbnails")]
             ])
-            try:
-                await query.message.delete()
-            except Exception:
-                pass
             try:
                 await context.bot.send_photo(
                     chat_id=user_id,
@@ -877,23 +872,25 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as e:
                 logger.error(f"Error sending thumbnail: {e}")
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text="❌ Failed to display thumbnail\n\nPlease send a new photo.",
+                    parse_mode="HTML"
+                )
         else:
             text = "❌ No thumbnail saved yet\n\nSend a photo to create one now"
             back_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("⬅️ Back", callback_data="submenu_thumbnails")]
             ])
-            try:
-                msg = query.message
-                if getattr(msg, "photo", None):
-                    await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-                else:
-                    await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-            except Exception:
-                pass
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=back_kb,
+                parse_mode="HTML"
+            )
         return
     
     if query.data == "thumb_delete":
-        await query.answer()
         if delete_thumbnail(user_id):
             text = "✅ Thumbnail deleted\n\nRemoved successfully. Send a new photo anytime"
         else:
@@ -901,49 +898,17 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         back_kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back", callback_data="submenu_thumbnails")]
         ])
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=back_kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=back_kb, parse_mode="HTML")
-        except Exception:
-            pass
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=back_kb,
+            parse_mode="HTML"
+        )
         return
     
-    # ✅ MENU_BACK - BANNER HATAYA, SIRF TEXT
+    # ✅ MENU_BACK - HOME MENU WITH BANNER
     if query.data == "menu_back":
-        await query.answer()
-        user_id = query.from_user.id
-        
-        text = (
-            "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-            "• Send/forward Image → Save cover\n"
-            "• Send/forward video → Apply cover\n"
-            "• /showthumbnail → View cover\n\n"
-            "📊 The bot never offline unless maintenance or admin intervention."
-        )
-        
-        kb_rows = [
-            [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
-             InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
-            [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings"),
-             InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
-        ]
-        
-        if is_admin(user_id):
-            kb_rows.append([InlineKeyboardButton("🛠️ Admin Panel", callback_data="admin_back")])
-        
-        kb = InlineKeyboardMarkup(kb_rows)
-        
-        try:
-            msg = query.message
-            if getattr(msg, "photo", None):
-                await msg.edit_caption(text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await msg.edit_text(text, reply_markup=kb, parse_mode="HTML")
-        except Exception as e:
-            logger.debug(f"Menu back error: {e}")
+        await send_home_menu(context, user_id, user_id)
         return
     
     logger.warning(f"⚠️ Unknown callback: {query.data}")
@@ -956,49 +921,16 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """---------------------- Menus--------------------- """
 
 async def open_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = (
-        "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-        "• Send/forward Image → Save cover\n"
-        "• Send/forward video → Apply cover\n"
-        "• /showthumbnail → View cover\n\n"
-        "📊 The bot never offline unless maintenance or admin intervention."
-    )
-
-    kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
-         InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
-        [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings"),
-         InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
-    ])
+    user_id = update.effective_user.id
     
     if update.callback_query:
-        msg = update.callback_query.message
         try:
-            try:
-                await msg.delete()
-            except Exception:
-                pass            
-            # ✅ BANNER HATAYA - SIRF TEXT
-            await context.bot.send_message(
-                chat_id=msg.chat.id,
-                text=text,
-                reply_markup=kb,
-                parse_mode="HTML"
-            )
-        except Exception as e:
-            logger.warning(f"Error sending home menu: {e}")
-            try:
-                await context.bot.send_message(
-                    chat_id=msg.chat.id,
-                    text=text,
-                    reply_markup=kb,
-                    parse_mode="HTML"
-                )
-            except Exception:
-                pass
+            await update.callback_query.message.delete()
+        except Exception:
+            pass
+        await send_home_menu(context, user_id, user_id)
     else:
-        # ✅ BANNER HATAYA - SIRF TEXT
-        await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+        await send_home_menu(context, user_id, user_id)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1036,39 +968,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.warning(f"❌ User {user_id} blocked by force-sub check")
         return
     
-    text = (
-        "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
-        "• Send/forward Image → Save cover\n"
-        "• Send/forward video → Apply cover\n"
-        "• /showthumbnail → View cover\n\n"
-        "📊 The bot never offline unless maintenance or admin intervention."
-    )
-    
-    kb_rows = [
-        [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
-         InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
-        [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings"),
-         InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
-    ]
-    
-    if is_admin(user_id):
-        kb_rows.append([InlineKeyboardButton("🛠️ Admin Panel", callback_data="admin_back")])
-    
-    kb = InlineKeyboardMarkup(kb_rows)
-    
-    # ✅ SIRF START COMMAND PAR BANNER
-    banner = HOME_MENU_BANNER_URL
-    if banner:
-        try:
-            if isinstance(banner, str) and os.path.isfile(banner):
-                await update.message.reply_photo(photo=InputFile(banner), caption=text, reply_markup=kb, parse_mode="HTML")
-            else:
-                await update.message.reply_photo(photo=banner, caption=text, reply_markup=kb, parse_mode="HTML")
-            return
-        except Exception as e:
-            logger.warning(f"Could not send banner: {e}")
-    
-    await update.message.reply_text(text, reply_markup=kb, parse_mode="HTML")
+    await send_home_menu(context, user_id, user_id)
 
 
 async def show_thumbnail_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1136,7 +1036,6 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "✓ Keep your covers fresh\n\n"
         "📞 Need help? Contact: /about"
     )
-    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, parse_mode="HTML")
 
 
@@ -1159,7 +1058,6 @@ async def about(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "📧 For help: /about → Developer\n\n"
         "Thank you for using this bot! 🎬"
     )
-    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, parse_mode="HTML")
 
 
@@ -1183,7 +1081,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
-    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
 
 
@@ -1458,7 +1355,6 @@ async def admin_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")],
     ])
     
-    # ✅ BANNER HATAYA - SIRF TEXT
     await update.message.reply_text(text, reply_markup=admin_kb, parse_mode="HTML")
 
 
