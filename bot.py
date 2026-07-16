@@ -68,6 +68,12 @@ def bold_entities(text: str):
         return None
     return [MessageEntity(type="bold", offset=0, length=len(text))]
 
+def get_ist_datetime_str():
+    """Returns current IST datetime as formatted string"""
+    ist = pytz.timezone('Asia/Kolkata')
+    now = datetime.now(ist)
+    return now.strftime("%Y-%m-%d %I:%M:%S %p IST")
+
 # Logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
