@@ -1555,12 +1555,12 @@ async def post_init(app: Application):
     logger.info("🚀 Bot is starting up...")
     
     if LOG_CHANNEL_ID:
-    try:
-        deploy_message = (
-            "🚀 <b>Bot is Live</b>\n\n"
-            f"📅 Time: {get_ist_datetime_str()}\n"
-            f"👑 Owner: @{OWNER_USERNAME or 'Owner'}"
-        )
+        try:
+            deploy_message = (
+                "🚀 <b>Bot is Live</b>\n\n"
+                f"📅 Time: {get_ist_datetime_str()}\n"
+                f"👑 Owner: @{OWNER_USERNAME or 'Owner'}"
+            )
             
             await app.bot.send_message(
                 chat_id=LOG_CHANNEL_ID,
@@ -1571,6 +1571,27 @@ async def post_init(app: Application):
             
         except Exception as e:
             logger.error(f"❌ Failed to send deploy log: {e}")
+    
+    try:
+        from telegram import BotCommand
+        commands = [
+            BotCommand("start", "🏠 Start bot"),
+            BotCommand("help", "ℹ️ How to use"),
+            BotCommand("about", "🤖 About bot"),
+            BotCommand("settings", "⚙️ Settings"),
+            BotCommand("remove", "🗑️ Remove thumbnail"),
+            BotCommand("showthumbnail", "🖼️ Show thumbnail"),
+            BotCommand("admin", "🛠️ Admin panel"),
+            BotCommand("ban", "🚫 Ban user"),
+            BotCommand("unban", "✅ Unban user"),
+            BotCommand("stats", "📊 Bot statistics"),
+            BotCommand("status", "⏱️ Bot status"),
+            BotCommand("broadcast", "📢 Broadcast message"),
+        ]
+        await app.bot.set_my_commands(commands)
+        logger.info("✅ Bot commands configured successfully")
+    except Exception as e:
+        logger.error(f"❌ Error setting bot commands: {e}")
     
     try:
         from telegram import BotCommand
