@@ -739,23 +739,24 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         if key == "settings":
-            text = (
-                "⏰ <b>Time Now (IST)</b> - {ist_time}\n"
-                "⚙️ <b>Config Bot Settings</b>\n\n"
-                "Select an option below to change settings 👇\n\n"
-            )
-            settings_kb = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-                [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
-                [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
-            ])
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=text,
-                reply_markup=settings_kb,
-                parse_mode="HTML"
-            )
-            return
+    ist_time = get_ist_datetime_str()  # ← ये लाइन जोड़ें
+    text = (
+        f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"  # ← f लगाएं
+        "⚙️ <b>Config Bot Settings</b>\n\n"
+        "Select an option below to change settings 👇\n\n"
+    )
+    settings_kb = InlineKeyboardMarkup([
+        [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
+        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
+        [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
+    ])
+    await context.bot.send_message(
+        chat_id=user_id,
+        text=text,
+        reply_markup=settings_kb,
+        parse_mode="HTML"
+    )
+    return
         
         if key == "developer":
             dev_contact = f"https://t.me/{OWNER_USERNAME}" if OWNER_USERNAME else f"tg://user?id={OWNER_ID}"
@@ -1055,9 +1056,11 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.message.from_user.id
     thumb_status = "✅ Saved & Ready" if has_thumbnail(user_id) else "❌ Not saved yet"
+    ist_time = get_ist_datetime_str()  # ← ये लाइन जोड़ें
     
     text = (
-        "⚙️ Your Settings\n\n"
+        f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"  # ← ये लाइन जोड़ें
+        "⚙️ <b>Your Settings</b>\n\n"
         "<b>Account information:</b>\n"
         f"👤 User ID: <code>{user_id}</code>\n\n"
         "<b>Thumbnail status:</b>\n"
@@ -1071,7 +1074,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
     await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
-
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
