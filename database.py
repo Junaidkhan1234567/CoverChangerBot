@@ -307,13 +307,3 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
     action = "🗑️ Thumbnail Removed"
     logger.info(f"✅ {action} - {username} ({user_id})")
     return create_log_entry(user_id, username, action)
-
-def is_user_exists(user_id: int) -> bool:
-    """Check if user exists in database"""
-    try:
-        users_collection = db.get_collection("users")
-        user = users_collection.find_one({"user_id": user_id})
-        return user is not None
-    except Exception as e:
-        logger.error(f"Error checking user existence: {e}")
-        return False
