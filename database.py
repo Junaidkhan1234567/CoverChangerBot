@@ -235,6 +235,20 @@ def get_stats() -> dict:
         }
 
 
+# ✅ यह नया फंक्शन जोड़ें
+def is_user_exists(user_id: int) -> bool:
+    """Check if user exists in database"""
+    if not DB_AVAILABLE:
+        return False
+    
+    try:
+        user_record = users_collection.find_one({"user_id": user_id})
+        return user_record is not None
+    except Exception as e:
+        logger.error(f"❌ Error checking user existence: {e}")
+        return False
+
+
 """═══════════════════ LOGGING FUNCTIONS ═══════════════════"""
 
 
