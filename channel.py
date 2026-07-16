@@ -108,9 +108,12 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data['awaiting_channel_id'] = True
     
     try:
-        msg = query.message
-        # Always send as text message, no photo
-        await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
+        # Only text message with buttons - NO PHOTO
+        await query.edit_message_text(
+            text, 
+            reply_markup=keyboard_markup, 
+            parse_mode="HTML"
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
@@ -151,9 +154,12 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     ])
     
     try:
-        msg = query.message
-        # Always send as text message, no photo
-        await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        # Only text message with buttons - NO PHOTO
+        await query.edit_message_text(
+            text, 
+            reply_markup=keyboard, 
+            parse_mode="HTML"
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
@@ -189,9 +195,12 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     
     try:
-        msg = query.message
-        # Always send as text message, no photo
-        await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        # Only text message with buttons - NO PHOTO
+        await query.edit_message_text(
+            text, 
+            reply_markup=keyboard, 
+            parse_mode="HTML"
+        )
         await query.answer()
     except Exception as e:
         logger.error(f"Error removing channel: {e}")
@@ -242,7 +251,12 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
             
-            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+            # Only text message with buttons - NO PHOTO
+            await update.message.reply_text(
+                text, 
+                reply_markup=keyboard, 
+                parse_mode="HTML"
+            )
             
             logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
             
