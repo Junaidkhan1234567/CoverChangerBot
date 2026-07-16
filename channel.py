@@ -109,10 +109,8 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
+        # Always send as text message, no photo
+        await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
         await query.answer()
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
@@ -154,10 +152,8 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     
     try:
         msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        # Always send as text message, no photo
+        await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
         await query.answer()
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
@@ -194,10 +190,8 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     try:
         msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
+        # Always send as text message, no photo
+        await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
         await query.answer()
     except Exception as e:
         logger.error(f"Error removing channel: {e}")
