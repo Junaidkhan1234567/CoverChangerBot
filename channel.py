@@ -101,18 +101,6 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text += "📤 Toggle Forward – Enable/disable forwarding\n"
     text += "🗑️ Remove Channel – Clear current channel"
     
-    toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
-    
-    keyboard = [
-        [
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
-        ],
-        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-    ]
-    
-    keyboard_markup = InlineKeyboardMarkup(keyboard)
-    
     context.user_data['awaiting_channel_id'] = True
     
     try:
