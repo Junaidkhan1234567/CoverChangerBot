@@ -371,7 +371,7 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def send_home_menu(context, chat_id: int, user_id: int = None):
-    """Helper function to send home menu with banner"""
+    """Helper function to send home menu with banner - SAME TEXT AS /start"""
     text = (
         "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
         "• Send/forward Image → Save cover\n"
@@ -668,30 +668,14 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await context.bot.send_message(chat_id=user_id, text="Owner contact not configured.")
         return
 
+    # ✅ MENU CALLBACKS
     if query.data.startswith("menu_"):
         key = query.data.split("menu_")[1]
         logger.info(f"📋 Menu callback: {key} for user {user_id}")
         
+        # ✅ menu_back - DIRECT HOME MENU (BANNER KE SAATH)
         if key == "back":
-            text = (
-                "👋 Welcome to Cover Changer Bot\n\n"
-                "<b>Quick Start Guide:</b>\n\n"
-                "📸 <b>Step 1:</b> Send a photo as thumbnail\n"
-                "🎥 <b>Step 2:</b> Send a video to apply cover\n\n"
-            )
-            kb_rows = [
-                [InlineKeyboardButton("❓ Help", callback_data="menu_help"),
-                 InlineKeyboardButton("ℹ️ About", callback_data="menu_about")],
-                [InlineKeyboardButton("⚙️ Settings", callback_data="menu_settings"),
-                 InlineKeyboardButton("👨‍💻 Developer", callback_data="menu_developer")],
-            ]
-            kb = InlineKeyboardMarkup(kb_rows)
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=text,
-                reply_markup=kb,
-                parse_mode="HTML"
-            )
+            await send_home_menu(context, user_id, user_id)
             return
         
         if key == "help":
@@ -906,7 +890,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # ✅ MENU_BACK - HOME MENU WITH BANNER
+    # ✅ MENU_BACK - DIRECT HOME MENU WITH BANNER (SAME TEXT AS /start)
     if query.data == "menu_back":
         await send_home_menu(context, user_id, user_id)
         return
