@@ -74,6 +74,14 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     query = update.callback_query
     user_id = query.from_user.id
     
+    # ✅ OLD MESSAGE DELETE KARO
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    
+    await query.answer()
+    
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
     
@@ -108,12 +116,12 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data['awaiting_channel_id'] = True
     
     try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
-        await query.answer()
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard_markup,
+            parse_mode="HTML"
+        )
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
 
@@ -121,6 +129,14 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     """Toggle forward enabled/disabled"""
     query = update.callback_query
     user_id = query.from_user.id
+    
+    # ✅ OLD MESSAGE DELETE KARO
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    
+    await query.answer()
     
     current_forward_status = get_forward_enabled(user_id)
     new_status = not current_forward_status
@@ -153,19 +169,27 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     ])
     
     try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-        await query.answer()
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel - shows simple success message"""
+    """Remove saved channel"""
     query = update.callback_query
     user_id = query.from_user.id
+    
+    # ✅ OLD MESSAGE DELETE KARO
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    
+    await query.answer()
     
     current_channel = get_user_channel(user_id)
     
@@ -191,12 +215,12 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     
     try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-        await query.answer()
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
     except Exception as e:
         logger.error(f"Error removing channel: {e}")
 
