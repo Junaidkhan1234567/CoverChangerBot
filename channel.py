@@ -108,12 +108,11 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data['awaiting_channel_id'] = True
     
     try:
-        # ✅ SIRF TEXT + BUTTONS - NO PHOTO CHECK
-        await query.edit_message_text(
-            text, 
-            reply_markup=keyboard_markup, 
-            parse_mode="HTML"
-        )
+        msg = query.message
+        if hasattr(msg, "photo") and msg.photo:
+            await msg.edit_caption(text, reply_markup=keyboard_markup, parse_mode="HTML")
+        else:
+            await msg.edit_text(text, reply_markup=keyboard_markup, parse_mode="HTML")
         await query.answer()
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
@@ -154,12 +153,11 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     ])
     
     try:
-        # ✅ SIRF TEXT + BUTTONS - NO PHOTO CHECK
-        await query.edit_message_text(
-            text, 
-            reply_markup=keyboard, 
-            parse_mode="HTML"
-        )
+        msg = query.message
+        if hasattr(msg, "photo") and msg.photo:
+            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
+        else:
+            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
         await query.answer()
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
@@ -178,12 +176,10 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
         context.user_data['awaiting_channel_id'] = True
     else:
-        # ═══════ REMOVE CHANNEL ═══════
         save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
         context.user_data['awaiting_channel_id'] = True
         
-        # ═══════ SIMPLE SUCCESS MESSAGE ═══════
         text = "Channel remove Successfully ✅"
         
         keyboard = InlineKeyboardMarkup([
@@ -195,12 +191,11 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         ])
     
     try:
-        # ✅ SIRF TEXT + BUTTONS - NO PHOTO CHECK
-        await query.edit_message_text(
-            text, 
-            reply_markup=keyboard, 
-            parse_mode="HTML"
-        )
+        msg = query.message
+        if hasattr(msg, "photo") and msg.photo:
+            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
+        else:
+            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
         await query.answer()
     except Exception as e:
         logger.error(f"Error removing channel: {e}")
@@ -251,12 +246,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
             
-            # ✅ SIRF TEXT + BUTTONS - NO PHOTO
-            await update.message.reply_text(
-                text, 
-                reply_markup=keyboard, 
-                parse_mode="HTML"
-            )
+            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
             
             logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
             
