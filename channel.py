@@ -226,7 +226,7 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = "✅ <b>Channel removed successfully!</b>"
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_back")]
+            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="send_home_menu")]
         ])
         
         msg = await context.bot.send_message(
