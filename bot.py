@@ -739,9 +739,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         if key == "settings":
-    ist_time = get_ist_datetime_str()  # ← ये लाइन जोड़ें
+    ist_time = get_ist_datetime_str()
     text = (
-        f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"  # ← f लगाएं
+        f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"
         "⚙️ <b>Config Bot Settings</b>\n\n"
         "Select an option below to change settings 👇\n\n"
     )
