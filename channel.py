@@ -70,7 +70,7 @@ async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TY
     await channel_set_prompt(update, context)
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show only text prompt to send channel ID - NO BUTTONS"""
+    """Show text prompt with Back button to send channel ID"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -99,13 +99,18 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text += "2️⃣ Copy the ID starting with -100\n\n"
     text += "⚠️ Make sure bot is admin in your channel!"
     
-    # ✅ KOI BUTTON NAHI - SIRF PROMPT
+    # ✅ BACK TO SETTINGS BUTTON
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+    ])
+    
     context.user_data['awaiting_channel_id'] = True
     
     try:
         await context.bot.send_message(
             chat_id=user_id,
             text=text,
+            reply_markup=keyboard,
             parse_mode="HTML"
         )
     except Exception as e:
@@ -160,7 +165,7 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel - show prompt to send new channel ID"""
+    """Remove saved channel - show prompt with Back button"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -185,9 +190,15 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         context.user_data['awaiting_channel_id'] = True
         
+        # ✅ BACK TO SETTINGS BUTTON
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+        ])
+        
         await context.bot.send_message(
             chat_id=user_id,
             text=text,
+            reply_markup=keyboard,
             parse_mode="HTML"
         )
     else:
@@ -204,9 +215,15 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "2️⃣ Copy the ID starting with -100\n\n"
         text += "⚠️ Make sure bot is admin in your channel!"
         
+        # ✅ BACK TO SETTINGS BUTTON
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+        ])
+        
         await context.bot.send_message(
             chat_id=user_id,
             text=text,
+            reply_markup=keyboard,
             parse_mode="HTML"
         )
 
@@ -219,15 +236,18 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
         return False
     
     if not channel_id.startswith('-100'):
-        await update.message.reply_text(
+        text = (
             "❌ <b>Invalid Channel ID</b>\n\n"
             "Channel ID must start with <code>-100</code>\n\n"
             "To get your channel ID:\n"
             "1️⃣ Forward any message from your channel to @getidsbot\n"
             "2️⃣ Copy the ID starting with -100\n\n"
-            "Try again or send correct Channel ID.",
-            parse_mode="HTML"
+            "Try again or send correct Channel ID."
         )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+        ])
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
         return True
     
     try:
@@ -265,33 +285,39 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             
         except BadRequest as e:
             if "user not found" in str(e).lower():
-                await update.message.reply_text(
+                text = (
                     "❌ <b>Channel Not Found</b>\n\n"
                     "Make sure:\n"
                     "• The channel ID is correct\n"
                     "• The bot is an admin in the channel\n"
                     "• The channel exists\n\n"
-                    "Try again or send correct Channel ID.",
-                    parse_mode="HTML"
+                    "Try again or send correct Channel ID."
                 )
             else:
-                await update.message.reply_text(
+                text = (
                     f"❌ <b>Error</b>\n\n"
                     f"Could not verify channel: {str(e)[:100]}\n\n"
                     "Make sure the bot is an admin in the channel.\n"
-                    "Try again or send correct Channel ID.",
-                    parse_mode="HTML"
+                    "Try again or send correct Channel ID."
                 )
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+            ])
+            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
             return True
             
     except Exception as e:
         logger.error(f"Error verifying channel: {e}")
-        await update.message.reply_text(
+        text = (
             f"❌ <b>Error</b>\n\n"
             f"Could not verify channel. Error: {str(e)[:100]}\n\n"
-            "Please try again or send correct Channel ID.",
-            parse_mode="HTML"
+            "Please try again or send correct Channel ID."
         )
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+        ])
+        await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
         return True
 
 async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
