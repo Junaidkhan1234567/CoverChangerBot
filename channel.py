@@ -100,13 +100,13 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text += "⚠️ Make sure bot is admin in your channel!"
     
     # ✅ BACK TO SETTINGS BUTTON
-        keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
-                    InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
-                ],
-                [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
-            ])
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
+            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+        ],
+        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+    ])
     
     context.user_data['awaiting_channel_id'] = True
     
