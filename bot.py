@@ -2,8 +2,9 @@ import os
 import logging
 import asyncio
 import re
+import pytz  # ← ADD THIS
 from datetime import datetime, timezone, timedelta
-from channel import get_ist_datetime_str
+# from channel import get_ist_datetime_str  # ← DELETE THIS LINE
 from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (
