@@ -111,18 +111,24 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     try:
         if query and query.message:
+            # ✅ OLD MESSAGE KA MESSAGE_ID STORE KARO
+            context.user_data['channel_settings_message_id'] = query.message.message_id
+            context.user_data['channel_settings_chat_id'] = query.message.chat_id
+            
             await query.message.edit_text(
                 text=text,
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
         else:
-            await context.bot.send_message(
+            msg = await context.bot.send_message(
                 chat_id=user_id,
                 text=text,
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
+            context.user_data['channel_settings_message_id'] = msg.message_id
+            context.user_data['channel_settings_chat_id'] = msg.chat_id
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
 
@@ -174,6 +180,9 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=keyboard,
             parse_mode="HTML"
         )
+        # ✅ MESSAGE ID UPDATE KARO
+        context.user_data['channel_settings_message_id'] = query.message.message_id
+        context.user_data['channel_settings_chat_id'] = query.message.chat_id
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
 
@@ -192,6 +201,9 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception:
         pass
     
+    # ✅ USER DATA CLEAR KARO
+    context.user_data['awaiting_channel_id'] = True
+    
     if not current_channel:
         text = "❌ <b>No channel is currently set.</b>\n\n"
         text += "📝 Send me your Channel ID to set it.\n"
@@ -201,22 +213,21 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text += "2️⃣ Copy the ID starting with -100\n\n"
         text += "⚠️ Make sure bot is admin in your channel!"
         
-        context.user_data['awaiting_channel_id'] = True
-        
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
         
-        await context.bot.send_message(
+        msg = await context.bot.send_message(
             chat_id=user_id,
             text=text,
             reply_markup=keyboard,
             parse_mode="HTML"
         )
+        context.user_data['channel_settings_message_id'] = msg.message_id
+        context.user_data['channel_settings_chat_id'] = msg.chat_id
     else:
         save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
-        context.user_data['awaiting_channel_id'] = True
         
         text = "✅ <b>Channel removed successfully!</b>\n\n"
         text += "📝 Send me a new Channel ID to set it.\n"
@@ -230,12 +241,14 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
         
-        await context.bot.send_message(
+        msg = await context.bot.send_message(
             chat_id=user_id,
             text=text,
             reply_markup=keyboard,
             parse_mode="HTML"
         )
+        context.user_data['channel_settings_message_id'] = msg.message_id
+        context.user_data['channel_settings_chat_id'] = msg.chat_id
 
 async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle channel ID input from user - DELETE OLD, SEND NEW"""
@@ -244,6 +257,30 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
     
     if not context.user_data.get('awaiting_channel_id', False):
         return False
+    
+    # ✅ OLD CHANNEL SETTINGS MESSAGE DELETE KARO
+    try:
+        old_msg_id = context.user_data.get('channel_settings_message_id')
+        old_chat_id = context.user_data.get('channel_settings_chat_id')
+        
+        if old_msg_id and old_chat_id:
+            await context.bot.delete_message(
+                chat_id=old_chat_id,
+                message_id=old_msg_id
+            )
+            logger.info(f"✅ Old channel settings message deleted: {old_msg_id}")
+    except Exception as e:
+        logger.warning(f"Could not delete old message: {e}")
+    
+    # ✅ USER KA MESSAGE DELETE KARO (JO CHANNEL ID SEND KI)
+    try:
+        await update.message.delete()
+    except Exception as e:
+        logger.warning(f"Could not delete user message: {e}")
+    
+    context.user_data['awaiting_channel_id'] = False
+    context.user_data['channel_settings_message_id'] = None
+    context.user_data['channel_settings_chat_id'] = None
     
     if not channel_id.startswith('-100'):
         text = (
@@ -257,7 +294,16 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
-        await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+        
+        msg = await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        context.user_data['channel_settings_message_id'] = msg.message_id
+        context.user_data['channel_settings_chat_id'] = msg.chat_id
+        context.user_data['awaiting_channel_id'] = True
         return True
     
     try:
@@ -267,8 +313,6 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             
             save_user_channel(user_id, channel_id)
             save_forward_enabled(user_id, True)
-            
-            context.user_data['awaiting_channel_id'] = False
             
             text = (
                 "✅ <b>Channel Set Successfully!</b>\n\n"
@@ -286,13 +330,14 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
             
-            # ✅ OLD MESSAGE DELETE KARO
-            try:
-                await update.message.delete()
-            except Exception:
-                pass
-            
-            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+            msg = await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            context.user_data['channel_settings_message_id'] = msg.message_id
+            context.user_data['channel_settings_chat_id'] = msg.chat_id
             
             logger.info(f"✅ Channel saved for user {user_id}: {channel_id}")
             
@@ -319,7 +364,16 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
-            await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+            
+            msg = await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            context.user_data['channel_settings_message_id'] = msg.message_id
+            context.user_data['channel_settings_chat_id'] = msg.chat_id
+            context.user_data['awaiting_channel_id'] = True
             return True
             
     except Exception as e:
@@ -332,7 +386,16 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
-        await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
+        
+        msg = await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        context.user_data['channel_settings_message_id'] = msg.message_id
+        context.user_data['channel_settings_chat_id'] = msg.chat_id
+        context.user_data['awaiting_channel_id'] = True
         return True
 
 async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -341,6 +404,8 @@ async def cancel_channel_setup(update: Update, context: ContextTypes.DEFAULT_TYP
     
     if context.user_data.get('awaiting_channel_id', False):
         context.user_data['awaiting_channel_id'] = False
+        context.user_data['channel_settings_message_id'] = None
+        context.user_data['channel_settings_chat_id'] = None
         await update.message.reply_text(
             "❌ <b>Channel Setup Cancelled</b>\n\n"
             "You can start again anytime from Settings.",
