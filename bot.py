@@ -2,9 +2,8 @@ import os
 import logging
 import asyncio
 import re
-import pytz  # ← ADD THIS
+import pytz
 from datetime import datetime, timezone, timedelta
-# from channel import get_ist_datetime_str  # ← DELETE THIS LINE
 from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (
@@ -24,7 +23,8 @@ from database import (
     save_thumbnail, get_thumbnail, delete_thumbnail, has_thumbnail,
     ban_user, unban_user, is_user_banned, get_total_users, get_banned_users_count, get_stats,
     format_log_message, log_new_user, log_user_banned, log_user_unbanned,
-    log_thumbnail_set, log_thumbnail_removed
+    log_thumbnail_set, log_thumbnail_removed,
+    is_user_exists
 )
 from telegram import MessageEntity
 from flask import Flask
@@ -739,24 +739,24 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         
         if key == "settings":
-    ist_time = get_ist_datetime_str()
-    text = (
-        f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"
-        "⚙️ <b>Config Bot Settings</b>\n\n"
-        "Select an option below to change settings 👇\n\n"
-    )
-    settings_kb = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
-        [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
-        [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
-    ])
-    await context.bot.send_message(
-        chat_id=user_id,
-        text=text,
-        reply_markup=settings_kb,
-        parse_mode="HTML"
-    )
-    return
+            ist_time = get_ist_datetime_str()
+            text = (
+                f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"
+                "⚙️ <b>Config Bot Settings</b>\n\n"
+                "Select an option below to change settings 👇\n\n"
+            )
+            settings_kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
+                [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
+                [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
+            ])
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=settings_kb,
+                parse_mode="HTML"
+            )
+            return
         
         if key == "developer":
             dev_contact = f"https://t.me/{OWNER_USERNAME}" if OWNER_USERNAME else f"tg://user?id={OWNER_ID}"
@@ -928,8 +928,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     first_name = update.effective_user.first_name or "User"
     
-    user_check = get_thumbnail(user_id)
-    is_new_user = user_check is None
+    # ✅ DATABASE SE CHECK KARO - ONLY NEW USERS GET LOG
+    is_new_user = not is_user_exists(user_id)
     
     if is_new_user:
         try:
@@ -1056,10 +1056,10 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     user_id = update.message.from_user.id
     thumb_status = "✅ Saved & Ready" if has_thumbnail(user_id) else "❌ Not saved yet"
-    ist_time = get_ist_datetime_str()  # ← ये लाइन जोड़ें
+    ist_time = get_ist_datetime_str()
     
     text = (
-        f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"  # ← ये लाइन जोड़ें
+        f"⏰ <b>Time Now (IST)</b> - {ist_time}\n"
         "⚙️ <b>Your Settings</b>\n\n"
         "<b>Account information:</b>\n"
         f"👤 User ID: <code>{user_id}</code>\n\n"
@@ -1074,6 +1074,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
     await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
+
 
 async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
@@ -1580,27 +1581,6 @@ async def post_init(app: Application):
             
         except Exception as e:
             logger.error(f"❌ Failed to send deploy log: {e}")
-    
-    try:
-        from telegram import BotCommand
-        commands = [
-            BotCommand("start", "🏠 Start bot"),
-            BotCommand("help", "ℹ️ How to use"),
-            BotCommand("about", "🤖 About bot"),
-            BotCommand("settings", "⚙️ Settings"),
-            BotCommand("remove", "🗑️ Remove thumbnail"),
-            BotCommand("showthumbnail", "🖼️ Show thumbnail"),
-            BotCommand("admin", "🛠️ Admin panel"),
-            BotCommand("ban", "🚫 Ban user"),
-            BotCommand("unban", "✅ Unban user"),
-            BotCommand("stats", "📊 Bot statistics"),
-            BotCommand("status", "⏱️ Bot status"),
-            BotCommand("broadcast", "📢 Broadcast message"),
-        ]
-        await app.bot.set_my_commands(commands)
-        logger.info("✅ Bot commands configured successfully")
-    except Exception as e:
-        logger.error(f"❌ Error setting bot commands: {e}")
     
     try:
         from telegram import BotCommand
