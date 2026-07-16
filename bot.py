@@ -3,6 +3,7 @@ import logging
 import asyncio
 import re
 from datetime import datetime, timezone, timedelta
+from channel import get_ist_datetime_str
 from telegram import InputMediaVideo, Update, InputFile, InlineKeyboardButton, InlineKeyboardMarkup, ChatMember
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (
@@ -1554,12 +1555,12 @@ async def post_init(app: Application):
     logger.info("🚀 Bot is starting up...")
     
     if LOG_CHANNEL_ID:
-        try:
-            deploy_message = (
-                "🚀 <b>Bot is Live</b>\n\n"
-                f"📅 Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-                f"👑 Owner: @{OWNER_USERNAME or 'Owner'}"
-            )
+    try:
+        deploy_message = (
+            "🚀 <b>Bot is Live</b>\n\n"
+            f"📅 Time: {get_ist_datetime_str()}\n"
+            f"👑 Owner: @{OWNER_USERNAME or 'Owner'}"
+        )
             
             await app.bot.send_message(
                 chat_id=LOG_CHANNEL_ID,
