@@ -207,8 +207,9 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not current_channel:
         text = "❌ <b>No channel is currently set.</b>"
         
+        # ✅ BACK TO HOME MENU BUTTON
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+            [InlineKeyboardButton("⬅️ Back to Home", callback_data="channel_back_home")]
         ])
         
         msg = await context.bot.send_message(
@@ -223,10 +224,16 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
         
-        text = "✅ <b>Channel removed successfully!</b>"
+        text = "✅ <b>Channel removed successfully!</b>\n\n"
+        text += "📝 Send me a new Channel ID to set it.\n"
+        text += "Example: <code>-1001234567890</code>\n\n"
+        text += "ℹ️ To get your channel ID:\n"
+        text += "1️⃣ Forward any message from your channel to @getidsbot\n"
+        text += "2️⃣ Copy the ID starting with -100\n\n"
+        text += "⚠️ Make sure bot is admin in your channel!"
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="send_home_menu")]
+            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
         ])
         
         msg = await context.bot.send_message(
@@ -237,6 +244,23 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         context.user_data['channel_settings_message_id'] = msg.message_id
         context.user_data['channel_settings_chat_id'] = msg.chat_id
+
+async def channel_back_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Go back to Home Menu with banner"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    # ✅ OLD MESSAGE DELETE KARO
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    
+    await query.answer()
+    
+    # ✅ HOME MENU SEND KARO (JO /start PAR AATA HAI)
+    from bot import send_home_menu
+    await send_home_menu(context, user_id, user_id)
 
 async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle channel ID input from user - DELETE OLD, SEND NEW"""
@@ -311,6 +335,10 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             )
             
             keyboard = InlineKeyboardMarkup([
+                [
+                    InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
+                    InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+                ],
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
             
@@ -408,6 +436,7 @@ def register_channel_handlers(app):
     app.add_handler(CallbackQueryHandler(channel_set_prompt, pattern="^channel_set$"))
     app.add_handler(CallbackQueryHandler(channel_toggle_forward, pattern="^channel_toggle_forward$"))
     app.add_handler(CallbackQueryHandler(channel_remove, pattern="^channel_remove$"))
+    app.add_handler(CallbackQueryHandler(channel_back_home, pattern="^channel_back_home$"))
     
     app.add_handler(CommandHandler("cancel", cancel_channel_setup))
     
@@ -417,4 +446,4 @@ def register_channel_handlers(app):
     ), group=10)
     
     logger.info("✅ Channel handlers registered successfully")
-    return app
+    return app 
