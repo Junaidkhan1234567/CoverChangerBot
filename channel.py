@@ -67,15 +67,34 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Handle channel settings button from menu - DELETE OLD, SEND NEW"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    await query.answer()
+    
+    # ✅ DELETE OLD MESSAGE
+    try:
+        await query.message.delete()
+    except Exception as e:
+        logger.warning(f"Could not delete old message: {e}")
+    
     await channel_set_prompt(update, context)
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings with current status and buttons"""
+    """Show channel settings with current status and buttons - SEND NEW MESSAGE"""
     query = update.callback_query
     user_id = query.from_user.id
     
     if query:
         await query.answer()
+    
+    # ✅ DELETE OLD MESSAGE (if any)
+    try:
+        if query and query.message:
+            await query.message.delete()
+    except Exception as e:
+        logger.warning(f"Could not delete old message: {e}")
     
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
@@ -109,26 +128,16 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     context.user_data['awaiting_channel_id'] = True
     
+    # ✅ SEND NEW MESSAGE
     try:
-        if query and query.message:
-            # ✅ OLD MESSAGE KA MESSAGE_ID STORE KARO
-            context.user_data['channel_settings_message_id'] = query.message.message_id
-            context.user_data['channel_settings_chat_id'] = query.message.chat_id
-            
-            await query.message.edit_text(
-                text=text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
-        else:
-            msg = await context.bot.send_message(
-                chat_id=user_id,
-                text=text,
-                reply_markup=keyboard,
-                parse_mode="HTML"
-            )
-            context.user_data['channel_settings_message_id'] = msg.message_id
-            context.user_data['channel_settings_chat_id'] = msg.chat_id
+        msg = await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
+        context.user_data['channel_settings_message_id'] = msg.message_id
+        context.user_data['channel_settings_chat_id'] = msg.chat_id
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
 
@@ -440,4 +449,4 @@ def register_channel_handlers(app):
     ), group=10)
     
     logger.info("✅ Channel handlers registered successfully")
-    return app 
+    return app
