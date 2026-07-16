@@ -311,10 +311,6 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             )
             
             keyboard = InlineKeyboardMarkup([
-                [
-                    InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
-                    InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
-                ],
                 [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
             ])
             
