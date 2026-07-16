@@ -732,12 +732,9 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         if key == "settings":
             text = (
-                "⚙️ Settings\n\n"
-                "<b>Manage your content:</b>\n\n"
-                "🖼️ <b>Thumbnail Manager</b>\n"
-                "   • View current thumbnail\n"
-                "   • Delete & update\n\n"
-                "Select options below to continue:"
+                "⏰ <b>Time Now (IST)</b> - {ist_time}\n"
+                "⚙️ <b>Config Bot Settings</b>\n\n"
+                "Select an option below to change settings 👇\n\n"
             )
             settings_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
