@@ -211,7 +211,6 @@ async def check_admin_and_banned(update: Update, user_id_to_check: int = None) -
 
 
 """------------------FORCE-SUB CHECK-----------------"""
-
 async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
     user_id = update.effective_user.id
 
@@ -221,12 +220,13 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not FORCE_SUB_CHANNEL_ID:
         return True
 
-    if user_id in verified_users:
-        logger.info(f"🔍 User {user_id} is cached - checking if still a member...")
-        
+    # 🔥 Database se check karo - permanent storage
+    is_verified = is_user_verified(user_id)
+    
+    if is_verified:
+        # Verify user is still a member of the channel
         try:
             channel_id_str = str(FORCE_SUB_CHANNEL_ID).strip()
-            
             try:
                 if channel_id_str.startswith("-"):
                     channel_id = int(channel_id_str)
@@ -244,14 +244,17 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 logger.info(f"✅ User {user_id} is still a member - access granted")
                 return True
             
-            logger.warning(f"⚠️ User {user_id} left the channel - removing from cache")
-            verified_users.discard(user_id)
+            # User left the channel - remove verification
+            logger.warning(f"⚠️ User {user_id} left the channel - removing verification")
+            set_user_verified(user_id, False)
             
         except Exception as e:
-            logger.warning(f"Could not verify membership for cached user {user_id}: {e}")
-            verified_users.discard(user_id)
+            logger.warning(f"Could not verify membership for user {user_id}: {e}")
+            # Agar error aata hai toh allow karein
+            return True
     
-    logger.info(f"🔒 User {user_id} not verified or left channel - showing join prompt")
+    # 🔒 User not verified - show join prompt
+    logger.info(f"🔒 User {user_id} not verified - showing join prompt")
 
     try:
         channel_id_str = str(FORCE_SUB_CHANNEL_ID).strip()
