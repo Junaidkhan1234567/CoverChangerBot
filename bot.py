@@ -514,7 +514,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ChatMemberStatus.ADMINISTRATOR,
                 ChatMemberStatus.OWNER
             ):
-                verified_users.add(user_id)
+                set_user_verified(user_id, True)
                 logger.info(f"✅ User {user_id} verified successfully with status {member.status}")
                 await query.answer("✅ Channel verified successfully!", show_alert=False)
                 await send_home_menu(context, user_id, user_id)
