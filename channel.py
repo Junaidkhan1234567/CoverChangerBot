@@ -1,4 +1,5 @@
-# channel.py
+# channel.py - Complete with RED buttons
+
 import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
@@ -67,34 +68,15 @@ def save_forward_enabled(user_id: int, enabled: bool) -> None:
 # ═══════════════════ CALLBACK FUNCTIONS ═══════════════════
 
 async def show_channel_settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle channel settings button from menu - DELETE OLD, SEND NEW"""
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    await query.answer()
-    
-    # ✅ DELETE OLD MESSAGE
-    try:
-        await query.message.delete()
-    except Exception as e:
-        logger.warning(f"Could not delete old message: {e}")
-    
     await channel_set_prompt(update, context)
 
 async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show channel settings with current status and buttons - SEND NEW MESSAGE"""
+    """Show channel settings with COLORED buttons"""
     query = update.callback_query
     user_id = query.from_user.id
     
     if query:
         await query.answer()
-    
-    # ✅ DELETE OLD MESSAGE (if any)
-    try:
-        if query and query.message:
-            await query.message.delete()
-    except Exception as e:
-        logger.warning(f"Could not delete old message: {e}")
     
     current_channel = get_user_channel(user_id)
     forward_enabled = get_forward_enabled(user_id)
@@ -116,33 +98,56 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text += "2️⃣ Copy the ID starting with -100\n\n"
     text += "⚠️ Make sure bot is admin in your channel!"
     
-    # ✅ BUTTONS
+    # ✅ COLORED BUTTONS
     toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+            InlineKeyboardButton(
+                toggle_text,
+                callback_data="channel_toggle_forward",
+                style="success" if forward_enabled else "danger"  # GREEN if ON, RED if OFF
+            ),
+            InlineKeyboardButton(
+                "🗑️ Remove Channel",
+                callback_data="channel_remove",
+                style="danger"  # 🔴 RED
+            ),
         ],
-        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+        [
+            InlineKeyboardButton(
+                "⬅️ Back to Settings",
+                callback_data="menu_settings",
+                style="primary"  # 🔵 BLUE
+            ),
+        ]
     ])
     
     context.user_data['awaiting_channel_id'] = True
     
-    # ✅ SEND NEW MESSAGE
     try:
-        msg = await context.bot.send_message(
-            chat_id=user_id,
-            text=text,
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-        context.user_data['channel_settings_message_id'] = msg.message_id
-        context.user_data['channel_settings_chat_id'] = msg.chat_id
+        if query and query.message:
+            context.user_data['channel_settings_message_id'] = query.message.message_id
+            context.user_data['channel_settings_chat_id'] = query.message.chat_id
+            
+            await query.message.edit_text(
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+        else:
+            msg = await context.bot.send_message(
+                chat_id=user_id,
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            context.user_data['channel_settings_message_id'] = msg.message_id
+            context.user_data['channel_settings_chat_id'] = msg.chat_id
     except Exception as e:
         logger.error(f"Error in channel set prompt: {e}")
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Toggle forward enabled/disabled - SIRF BUTTON CHANGE, DELETE NAHI"""
+    """Toggle forward enabled/disabled - WITH COLOR"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -177,10 +182,24 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     toggle_text = "📤 Forward OFF" if new_status else "📤 Forward ON"
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+            InlineKeyboardButton(
+                toggle_text,
+                callback_data="channel_toggle_forward",
+                style="success" if new_status else "danger"  # GREEN if ON, RED if OFF
+            ),
+            InlineKeyboardButton(
+                "🗑️ Remove Channel",
+                callback_data="channel_remove",
+                style="danger"  # 🔴 RED
+            ),
         ],
-        [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+        [
+            InlineKeyboardButton(
+                "⬅️ Back to Settings",
+                callback_data="menu_settings",
+                style="primary"  # 🔵 BLUE
+            ),
+        ]
     ])
     
     try:
@@ -189,14 +208,13 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
             reply_markup=keyboard,
             parse_mode="HTML"
         )
-        # ✅ MESSAGE ID UPDATE KARO
         context.user_data['channel_settings_message_id'] = query.message.message_id
         context.user_data['channel_settings_chat_id'] = query.message.chat_id
     except Exception as e:
         logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel - DELETE OLD, SEND NEW"""
+    """Remove saved channel - WITH RED BUTTONS"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -204,21 +222,24 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     current_channel = get_user_channel(user_id)
     
-    # ✅ OLD MESSAGE DELETE KARO
     try:
         await query.message.delete()
     except Exception:
         pass
     
-    # ✅ USER DATA CLEAR KARO
     context.user_data['awaiting_channel_id'] = True
     
     if not current_channel:
         text = "❌ <b>No channel is currently set.</b>"
         
-        # ✅ BACK TO HOME MENU BUTTON
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Home", callback_data="channel_back_home")]
+            [
+                InlineKeyboardButton(
+                    "🏠 Back to Home",
+                    callback_data="channel_back_home",
+                    style="danger"  # 🔴 RED
+                ),
+            ]
         ])
         
         msg = await context.bot.send_message(
@@ -233,10 +254,22 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_user_channel(user_id, None)
         save_forward_enabled(user_id, True)
         
-        text = "✅ <b>Channel removed successfully!</b>"
+        text = "✅ <b>Channel removed successfully!</b>\n\n"
+        text += "📝 Send me a new Channel ID to set it.\n"
+        text += "Example: <code>-1001234567890</code>\n\n"
+        text += "ℹ️ To get your channel ID:\n"
+        text += "1️⃣ Forward any message from your channel to @getidsbot\n"
+        text += "2️⃣ Copy the ID starting with -100\n\n"
+        text += "⚠️ Make sure bot is admin in your channel!"
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="channel_back_home")]
+            [
+                InlineKeyboardButton(
+                    "⬅️ Back to Settings",
+                    callback_data="menu_settings",
+                    style="danger"  # 🔴 RED
+                ),
+            ]
         ])
         
         msg = await context.bot.send_message(
@@ -253,7 +286,6 @@ async def channel_back_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     user_id = query.from_user.id
     
-    # ✅ OLD MESSAGE DELETE KARO
     try:
         await query.message.delete()
     except Exception:
@@ -261,19 +293,17 @@ async def channel_back_home(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.answer()
     
-    # ✅ HOME MENU SEND KARO (JO /start PAR AATA HAI)
     from bot import send_home_menu
     await send_home_menu(context, user_id, user_id)
 
 async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle channel ID input from user - DELETE OLD, SEND NEW"""
+    """Handle channel ID input from user"""
     user_id = update.message.from_user.id
     channel_id = update.message.text.strip()
     
     if not context.user_data.get('awaiting_channel_id', False):
         return False
     
-    # ✅ OLD CHANNEL SETTINGS MESSAGE DELETE KARO
     try:
         old_msg_id = context.user_data.get('channel_settings_message_id')
         old_chat_id = context.user_data.get('channel_settings_chat_id')
@@ -287,7 +317,6 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
     except Exception as e:
         logger.warning(f"Could not delete old message: {e}")
     
-    # ✅ USER KA MESSAGE DELETE KARO (JO CHANNEL ID SEND KI)
     try:
         await update.message.delete()
     except Exception as e:
@@ -307,7 +336,13 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             "Try again or send correct Channel ID."
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+            [
+                InlineKeyboardButton(
+                    "⬅️ Back to Settings",
+                    callback_data="menu_settings",
+                    style="primary"  # 🔵 BLUE
+                ),
+            ]
         ])
         
         msg = await context.bot.send_message(
@@ -339,10 +374,24 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("📤 Forward OFF", callback_data="channel_toggle_forward"),
-                    InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove")
+                    InlineKeyboardButton(
+                        "📤 Forward OFF",
+                        callback_data="channel_toggle_forward",
+                        style="danger"  # 🔴 RED (Initially OFF)
+                    ),
+                    InlineKeyboardButton(
+                        "🗑️ Remove Channel",
+                        callback_data="channel_remove",
+                        style="danger"  # 🔴 RED
+                    ),
                 ],
-                [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+                [
+                    InlineKeyboardButton(
+                        "⬅️ Back to Settings",
+                        callback_data="menu_settings",
+                        style="primary"  # 🔵 BLUE
+                    ),
+                ]
             ])
             
             msg = await context.bot.send_message(
@@ -377,7 +426,13 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
                 )
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+                [
+                    InlineKeyboardButton(
+                        "⬅️ Back to Settings",
+                        callback_data="menu_settings",
+                        style="primary"  # 🔵 BLUE
+                    ),
+                ]
             ])
             
             msg = await context.bot.send_message(
@@ -399,7 +454,13 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             "Please try again or send correct Channel ID."
         )
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
+            [
+                InlineKeyboardButton(
+                    "⬅️ Back to Settings",
+                    callback_data="menu_settings",
+                    style="primary"  # 🔵 BLUE
+                ),
+            ]
         ])
         
         msg = await context.bot.send_message(
