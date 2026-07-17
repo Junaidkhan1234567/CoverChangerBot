@@ -99,7 +99,7 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text += "⚠️ Make sure bot is admin in your channel!"
     
     # ✅ COLORED BUTTONS
-    toggle_text = "📤 Forward OFF" if forward_enabled else "📤 Forward ON"
+    toggle_text = "📤 Forward ON" if forward_enabled else "📤 Forward OFF"
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -179,7 +179,7 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     text += "2️⃣ Copy the ID starting with -100\n\n"
     text += "⚠️ Make sure bot is admin in your channel!"
     
-    toggle_text = "📤 Forward OFF" if new_status else "📤 Forward ON"
+    toggle_text = "📤 Forward ON" if new_status else "📤 Forward OFF"
     keyboard = InlineKeyboardMarkup([
         [
             InlineKeyboardButton(
@@ -375,7 +375,7 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(
-                        "📤 Forward OFF",
+                        "📤 Forward ON",
                         callback_data="channel_toggle_forward",
                         style="danger"  # 🔴 RED (Initially OFF)
                     ),
