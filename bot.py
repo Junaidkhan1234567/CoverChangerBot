@@ -24,7 +24,9 @@ from database import (
     ban_user, unban_user, is_user_banned, get_total_users, get_banned_users_count, get_stats,
     format_log_message, log_new_user, log_user_banned, log_user_unbanned,
     log_thumbnail_set, log_thumbnail_removed,
-    is_user_exists
+    is_user_exists,
+    is_user_verified,        # 👈 YEH ADD KARO
+    set_user_verified        # 👈 YEH ADD KARO
 )
 from telegram import MessageEntity
 from flask import Flask
