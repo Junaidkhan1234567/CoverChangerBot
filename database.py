@@ -321,3 +321,40 @@ def log_thumbnail_removed(user_id: int, username: str) -> dict:
     action = "🗑️ Thumbnail Removed"
     logger.info(f"✅ {action} - {username} ({user_id})")
     return create_log_entry(user_id, username, action)
+
+# ============ VERIFICATION FUNCTIONS ============
+
+def is_user_verified(user_id: int) -> bool:
+    """Check if user is verified in database"""
+    if not DB_AVAILABLE:
+        return False
+    
+    try:
+        user_record = users_collection.find_one({"user_id": user_id})
+        return user_record and user_record.get("is_verified", False)
+    except Exception as e:
+        logger.error(f"❌ Error checking verification: {e}")
+        return False
+
+def set_user_verified(user_id: int, verified: bool = True) -> bool:
+    """Set user verification status in database"""
+    if not DB_AVAILABLE:
+        return False
+    
+    try:
+        users_collection.update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "is_verified": verified,
+                    "verified_at": datetime.now() if verified else None
+                }
+            },
+            upsert=True
+        )
+        logger.info(f"✅ User {user_id} verification set to {verified}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error setting verification: {e}")
+        return False
