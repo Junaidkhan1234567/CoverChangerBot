@@ -57,22 +57,40 @@ class VideoEditor:
                 except:
                     font = ImageFont.load_default()
             
-            # Calculate text position
+            # Get text size using textbbox
             bbox = draw.textbbox((0, 0), watermark_text, font=font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
             
+            # Margin from edges
             margin = 20
             
-            pos_map = {
-                "top-left": (margin, margin),
-                "top-right": (img.size[0] - text_width - margin, margin),
-                "bottom-left": (margin, img.size[1] - text_height - margin),
-                "bottom-right": (img.size[0] - text_width - margin, img.size[1] - text_height - margin),
-                "center": ((img.size[0] - text_width) // 2, (img.size[1] - text_height) // 2)
-            }
+            # Position mapping - FIXED
+            img_width = img.size[0]
+            img_height = img.size[1]
             
-            x, y = pos_map.get(position, pos_map["bottom-right"])
+            # Calculate x, y based on position
+            if position == "top-left":
+                x = margin
+                y = margin
+            elif position == "top-right":
+                x = img_width - text_width - margin
+                y = margin
+            elif position == "bottom-left":
+                x = margin
+                y = img_height - text_height - margin
+            elif position == "bottom-right":
+                x = img_width - text_width - margin
+                y = img_height - text_height - margin
+            elif position == "center":
+                x = (img_width - text_width) // 2
+                y = (img_height - text_height) // 2
+            else:
+                # Default: bottom-right
+                x = img_width - text_width - margin
+                y = img_height - text_height - margin
+            
+            logger.info(f"📍 Position: {position}, Text size: {text_width}x{text_height}, Image: {img_width}x{img_height}, Position: ({x}, {y})")
             
             # Opacity (0-255)
             alpha = int(opacity * 255)
