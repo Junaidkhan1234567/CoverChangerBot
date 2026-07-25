@@ -258,6 +258,7 @@ async def watermark_position_set_callback(update: Update, context: ContextTypes.
     save_watermark_settings(user_id, settings)
     
     await query.answer(f"✅ Position: {position.replace('-', ' ').title()}")
+    # ✅ Return to position selection menu
     await watermark_position_callback(update, context)
 
 # ═══════════════════════════════════════════════════════
@@ -417,28 +418,24 @@ async def cancel_watermark_setup(update: Update, context: ContextTypes.DEFAULT_T
 def register_watermark_handlers(app):
     """Register all watermark-related handlers with the bot application"""
     
-    # Main watermark menu handler
+    # ⚠️ IMPORTANT: Pattern exact match karo
     app.add_handler(CallbackQueryHandler(watermark_menu_callback, pattern="^watermark_settings$"))
     
-    # Watermark main handlers
     app.add_handler(CallbackQueryHandler(watermark_toggle_callback, pattern="^watermark_toggle$"))
     app.add_handler(CallbackQueryHandler(watermark_set_text_callback, pattern="^watermark_set_text$"))
     app.add_handler(CallbackQueryHandler(watermark_position_callback, pattern="^watermark_position$"))
     app.add_handler(CallbackQueryHandler(watermark_opacity_callback, pattern="^watermark_opacity$"))
     app.add_handler(CallbackQueryHandler(watermark_font_size_callback, pattern="^watermark_font_size$"))
     
-    # Position and opacity set handlers
     app.add_handler(CallbackQueryHandler(watermark_position_set_callback, pattern="^watermark_pos_"))
     app.add_handler(CallbackQueryHandler(watermark_opacity_set_callback, pattern="^watermark_op_"))
     app.add_handler(CallbackQueryHandler(watermark_font_size_set_callback, pattern="^watermark_font_"))
     
-    # Text input handler
     app.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         handle_watermark_text_input
     ), group=21)
     
-    # Cancel command handler
     app.add_handler(CommandHandler("cancel", cancel_watermark_setup))
     
     logger.info("✅ Watermark handlers registered successfully")
