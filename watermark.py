@@ -1,30 +1,72 @@
 # watermark.py
 import os
 import logging
-import re
 from datetime import datetime
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InputFile
-from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
-from telegram.error import BadRequest
-from database import save_watermark_settings, get_watermark_settings
-from video_editor import video_editor
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, CommandHandler
+from database import db
 
 logger = logging.getLogger(__name__)
 
 # ═══════════════════════════════════════════════════════
-# WATERMARK SETTINGS MENU
+# DATABASE FUNCTIONS FOR WATERMARK
 # ═══════════════════════════════════════════════════════
 
-async def watermark_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Show complete watermark settings menu"""
+def get_watermark_settings(user_id: int) -> dict:
+    """Get watermark settings for user"""
+    try:
+        users_collection = db.get_collection("users")
+        user_data = users_collection.find_one({"user_id": user_id})
+        if user_data and "watermark" in user_data:
+            return user_data["watermark"]
+        return {
+            "enabled": False,
+            "text": "© {username} • Cover Bot",
+            "position": "bottom-right",
+            "opacity": 0.7,
+            "font_size": 30
+        }
+    except Exception as e:
+        logger.error(f"Error getting watermark settings: {e}")
+        return {
+            "enabled": False,
+            "text": "© {username} • Cover Bot",
+            "position": "bottom-right",
+            "opacity": 0.7,
+            "font_size": 30
+        }
+
+def save_watermark_settings(user_id: int, settings: dict) -> bool:
+    """Save watermark settings for user"""
+    try:
+        users_collection = db.get_collection("users")
+        users_collection.update_one(
+            {"user_id": user_id},
+            {"$set": {"watermark": settings}},
+            upsert=True
+        )
+        logger.info(f"✅ Watermark settings saved for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving watermark settings: {e}")
+        return False
+
+# ═══════════════════════════════════════════════════════
+# WATERMARK MENU FUNCTIONS
+# ═══════════════════════════════════════════════════════
+
+async def watermark_menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show watermark main menu with all options"""
     query = update.callback_query
     user_id = query.from_user.id
     settings = get_watermark_settings(user_id)
     
+    await query.answer()
+    
     status = "🟢 ON" if settings.get("enabled", False) else "🔴 OFF"
     
     text = (
-        "💧 <b>Watermark Settings</b>\n\n"
+        "🎨 <b>Watermark System</b>\n\n"
         f"<b>Status:</b> {status}\n"
         f"<b>Text:</b> <code>{settings.get('text', 'Not set') or 'Not set'}</code>\n"
         f"<b>Position:</b> {settings.get('position', 'bottom-right').replace('-', ' ').title()}\n"
@@ -39,7 +81,6 @@ async def watermark_settings_callback(update: Update, context: ContextTypes.DEFA
         [InlineKeyboardButton("📌 Change Position", callback_data="watermark_position")],
         [InlineKeyboardButton("🎚️ Adjust Opacity", callback_data="watermark_opacity")],
         [InlineKeyboardButton("📏 Font Size", callback_data="watermark_font_size")],
-        [InlineKeyboardButton("🖼️ Preview All Positions", callback_data="watermark_preview")],
         [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
     ])
     
@@ -49,10 +90,14 @@ async def watermark_settings_callback(update: Update, context: ContextTypes.DEFA
             await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
         else:
             await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-        await query.answer()
     except Exception as e:
-        logger.error(f"Watermark settings error: {e}")
-
+        logger.error(f"Watermark menu error: {e}")
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=text,
+            reply_markup=keyboard,
+            parse_mode="HTML"
+        )
 
 async def watermark_toggle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Toggle watermark ON/OFF"""
@@ -64,8 +109,7 @@ async def watermark_toggle_callback(update: Update, context: ContextTypes.DEFAUL
     
     status = "✅ ENABLED" if settings["enabled"] else "❌ DISABLED"
     await query.answer(f"Watermark {status}")
-    await watermark_settings_callback(update, context)
-
+    await watermark_menu_callback(update, context)
 
 async def watermark_set_text_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Prompt for watermark text input"""
@@ -103,7 +147,6 @@ async def watermark_set_text_callback(update: Update, context: ContextTypes.DEFA
             await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
     except Exception as e:
         logger.error(f"Error setting watermark text: {e}")
-
 
 async def handle_watermark_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle watermark text input from user"""
@@ -150,7 +193,6 @@ async def handle_watermark_text_input(update: Update, context: ContextTypes.DEFA
     await update.message.reply_text(text, reply_markup=keyboard, parse_mode="HTML")
     return True
 
-
 # ═══════════════════════════════════════════════════════
 # WATERMARK POSITION FUNCTIONS
 # ═══════════════════════════════════════════════════════
@@ -162,7 +204,6 @@ async def watermark_position_callback(update: Update, context: ContextTypes.DEFA
     settings = get_watermark_settings(user_id)
     current = settings.get("position", "bottom-right")
     
-    # Position options with visual indicators
     positions = [
         ("↖️ Top Left", "top-left"),
         ("↗️ Top Right", "top-right"),
@@ -178,7 +219,6 @@ async def watermark_position_callback(update: Update, context: ContextTypes.DEFA
     
     keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="watermark_settings")])
     
-    # Visual position guide
     guide = (
         "┌─────────────────────┐\n"
         "│ ↖️ TL      ↗️ TR   │\n"
@@ -194,12 +234,6 @@ async def watermark_position_callback(update: Update, context: ContextTypes.DEFA
         f"Current: <b>{current.replace('-', ' ').title()}</b>\n\n"
         "<b>🖼️ Position Guide:</b>\n"
         f"<code>{guide}</code>\n\n"
-        "<b>💡 Recommendations:</b>\n"
-        "↘️ Bottom Right - Most common, non-intrusive\n"
-        "↙️ Bottom Left - Good for branding\n"
-        "↖️ Top Left - Good for logos\n"
-        "↗️ Top Right - Less intrusive\n"
-        "🎯 Center - Not recommended\n\n"
         "👇 <b>Select a position:</b>"
     )
     
@@ -212,7 +246,6 @@ async def watermark_position_callback(update: Update, context: ContextTypes.DEFA
         await query.answer()
     except Exception as e:
         logger.error(f"Watermark position error: {e}")
-
 
 async def watermark_position_set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set watermark position"""
@@ -227,7 +260,6 @@ async def watermark_position_set_callback(update: Update, context: ContextTypes.
     await query.answer(f"✅ Position: {position.replace('-', ' ').title()}")
     await watermark_position_callback(update, context)
 
-
 # ═══════════════════════════════════════════════════════
 # WATERMARK OPACITY FUNCTIONS
 # ═══════════════════════════════════════════════════════
@@ -239,7 +271,6 @@ async def watermark_opacity_callback(update: Update, context: ContextTypes.DEFAU
     settings = get_watermark_settings(user_id)
     current = settings.get("opacity", 0.7)
     
-    # Opacity options with visual indicators
     opacities = [
         (0.1, "10% - Very Subtle"),
         (0.2, "20% - Light"),
@@ -260,19 +291,12 @@ async def watermark_opacity_callback(update: Update, context: ContextTypes.DEFAU
     
     keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="watermark_settings")])
     
-    # Opacity visual bar
     opacity_bar = _create_opacity_bar(current)
     
     text = (
         "🎚️ <b>Select Watermark Opacity</b>\n\n"
         f"{opacity_bar}\n"
         f"Current: <b>{int(current * 100)}%</b>\n\n"
-        "<b>💡 Tips:</b>\n"
-        "• 10-30% - Very subtle, almost invisible\n"
-        "• 30-50% - Subtle branding\n"
-        "• 50-70% - Standard visibility\n"
-        "• 70-90% - Bold branding\n"
-        "• 100% - Solid text\n\n"
         "👇 <b>Select opacity level:</b>"
     )
     
@@ -285,7 +309,6 @@ async def watermark_opacity_callback(update: Update, context: ContextTypes.DEFAU
         await query.answer()
     except Exception as e:
         logger.error(f"Watermark opacity error: {e}")
-
 
 async def watermark_opacity_set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set watermark opacity"""
@@ -300,16 +323,13 @@ async def watermark_opacity_set_callback(update: Update, context: ContextTypes.D
     await query.answer(f"✅ Opacity: {int(opacity * 100)}%")
     await watermark_opacity_callback(update, context)
 
-
 def _create_opacity_bar(current_opacity: float) -> str:
     """Create visual opacity bar"""
     total_bars = 20
     filled = int(current_opacity * total_bars)
     empty = total_bars - filled
-    
     bar = "█" * filled + "░" * empty
     return f"<code>{bar}</code>"
-
 
 # ═══════════════════════════════════════════════════════
 # WATERMARK FONT SIZE FUNCTIONS
@@ -340,11 +360,6 @@ async def watermark_font_size_callback(update: Update, context: ContextTypes.DEF
     text = (
         "📏 <b>Select Font Size</b>\n\n"
         f"Current: <b>{current}px</b>\n\n"
-        "<b>💡 Recommendations:</b>\n"
-        "• 16-24px - Small, subtle\n"
-        "• 24-32px - Standard\n"
-        "• 32-48px - Large, visible\n"
-        "• 48+px - Bold branding\n\n"
         "👇 <b>Select a size:</b>"
     )
     
@@ -357,7 +372,6 @@ async def watermark_font_size_callback(update: Update, context: ContextTypes.DEF
         await query.answer()
     except Exception as e:
         logger.error(f"Font size error: {e}")
-
 
 async def watermark_font_size_set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Set watermark font size"""
@@ -372,152 +386,9 @@ async def watermark_font_size_set_callback(update: Update, context: ContextTypes
     await query.answer(f"✅ Font Size: {font_size}px")
     await watermark_font_size_callback(update, context)
 
-
 # ═══════════════════════════════════════════════════════
-# WATERMARK PREVIEW FUNCTIONS
+# CANCEL FUNCTION
 # ═══════════════════════════════════════════════════════
-
-async def watermark_preview_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Prompt user to send video for preview"""
-    query = update.callback_query
-    await query.answer()
-    
-    text = (
-        "🖼️ <b>Watermark Position Preview</b>\n\n"
-        "I'll show you how watermark looks at all positions.\n\n"
-        "📤 <b>Send me a video</b> and I'll create a preview.\n\n"
-        "The preview will show watermark at:\n"
-        "↖️ Top Left\n"
-        "↗️ Top Right\n"
-        "↙️ Bottom Left\n"
-        "↘️ Bottom Right\n"
-        "🎯 Center\n\n"
-        "<b>📌 Note:</b> Only first 10 seconds will be used.\n\n"
-        "📤 <b>Send a video now</b>\n"
-        "Send /cancel to cancel"
-    )
-    
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("⬅️ Back", callback_data="watermark_settings")]
-    ])
-    
-    context.user_data['awaiting_preview_video'] = True
-    
-    try:
-        msg = query.message
-        if hasattr(msg, "photo") and msg.photo:
-            await msg.edit_caption(text, reply_markup=keyboard, parse_mode="HTML")
-        else:
-            await msg.edit_text(text, reply_markup=keyboard, parse_mode="HTML")
-    except Exception as e:
-        logger.error(f"Preview prompt error: {e}")
-
-
-async def handle_watermark_preview_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle video for watermark preview"""
-    if not context.user_data.get('awaiting_preview_video', False):
-        return False
-    
-    user_id = update.message.from_user.id
-    
-    if not update.message.video:
-        await update.message.reply_text("❌ Please send a video file.", parse_mode="HTML")
-        return True
-    
-    msg = await update.message.reply_text(
-        "⏳ Creating watermark preview... (This may take a moment)", 
-        parse_mode="HTML"
-    )
-    
-    try:
-        video = update.message.video.file_id
-        video_file = await context.bot.get_file(video)
-        
-        # Check file size (max 50MB)
-        if video_file.file_size > 50 * 1024 * 1024:
-            await msg.edit_text(
-                "❌ <b>Video too large!</b>\n\n"
-                "Maximum size: 50MB\n"
-                "Please send a smaller video for preview.",
-                parse_mode="HTML"
-            )
-            context.user_data['awaiting_preview_video'] = False
-            return True
-        
-        temp_path = os.path.join(video_editor.temp_dir, f"preview_input_{user_id}_{int(datetime.now().timestamp())}.mp4")
-        await video_file.download_to_drive(temp_path)
-        
-        # Get watermark text from settings
-        watermark_settings = get_watermark_settings(user_id)
-        watermark_text = watermark_settings.get("text", "© Video Cover Bot")
-        
-        # Create preview
-        preview_path = video_editor.create_watermark_preview(temp_path, watermark_text)
-        
-        # Send preview video
-        if preview_path and os.path.exists(preview_path):
-            with open(preview_path, 'rb') as f:
-                await context.bot.send_video(
-                    chat_id=update.effective_chat.id,
-                    video=InputFile(f),
-                    caption=(
-                        "🖼️ <b>Watermark Position Preview</b>\n\n"
-                        "📌 <b>Position Guide:</b>\n"
-                        "↖️ Top Left\n"
-                        "↗️ Top Right\n"
-                        "↙️ Bottom Left\n"
-                        "↘️ Bottom Right\n"
-                        "🎯 Center\n\n"
-                        "💡 <b>Choose your preferred position:</b>\n"
-                        "Go to <b>Settings → Watermark → Change Position</b>\n\n"
-                        "⚙️ <b>Adjust other settings:</b>\n"
-                        "• Text: Settings → Watermark → Set Text\n"
-                        "• Opacity: Settings → Watermark → Adjust Opacity\n"
-                        "• Font Size: Settings → Watermark → Font Size"
-                    ),
-                    parse_mode="HTML"
-                )
-        else:
-            await msg.edit_text(
-                "❌ <b>Preview creation failed</b>\n\n"
-                "Please try again with a different video.",
-                parse_mode="HTML"
-            )
-        
-        # Cleanup
-        try:
-            os.remove(temp_path)
-            if preview_path and os.path.exists(preview_path):
-                os.remove(preview_path)
-        except:
-            pass
-        
-        await msg.delete()
-        context.user_data['awaiting_preview_video'] = False
-        
-        # Send back to watermark settings
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⬅️ Back to Watermark Settings", callback_data="watermark_settings")]
-        ])
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="✅ Preview created! Choose your position from settings.",
-            reply_markup=keyboard,
-            parse_mode="HTML"
-        )
-        
-    except Exception as e:
-        logger.error(f"❌ Preview error: {e}")
-        await msg.edit_text(
-            f"❌ <b>Error creating preview:</b>\n\n"
-            f"{str(e)[:100]}\n\n"
-            "Please try with a smaller video file.",
-            parse_mode="HTML"
-        )
-        context.user_data['awaiting_preview_video'] = False
-    
-    return True
-
 
 async def cancel_watermark_setup(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Cancel watermark setup process"""
@@ -533,22 +404,11 @@ async def cancel_watermark_setup(update: Update, context: ContextTypes.DEFAULT_T
         logger.info(f"User {user_id} cancelled watermark text setup")
         return True
     
-    if context.user_data.get('awaiting_preview_video', False):
-        context.user_data['awaiting_preview_video'] = False
-        await update.message.reply_text(
-            "❌ <b>Preview Cancelled</b>\n\n"
-            "You can start again anytime from Watermark Settings.",
-            parse_mode="HTML"
-        )
-        logger.info(f"User {user_id} cancelled watermark preview")
-        return True
-    
     await update.message.reply_text(
         "ℹ️ No ongoing watermark setup to cancel.",
         parse_mode="HTML"
     )
     return True
-
 
 # ═══════════════════════════════════════════════════════
 # REGISTER HANDLERS
@@ -557,14 +417,15 @@ async def cancel_watermark_setup(update: Update, context: ContextTypes.DEFAULT_T
 def register_watermark_handlers(app):
     """Register all watermark-related handlers with the bot application"""
     
+    # Main watermark menu handler
+    app.add_handler(CallbackQueryHandler(watermark_menu_callback, pattern="^watermark_settings$"))
+    
     # Watermark main handlers
-    app.add_handler(CallbackQueryHandler(watermark_settings_callback, pattern="^watermark_settings$"))
     app.add_handler(CallbackQueryHandler(watermark_toggle_callback, pattern="^watermark_toggle$"))
     app.add_handler(CallbackQueryHandler(watermark_set_text_callback, pattern="^watermark_set_text$"))
     app.add_handler(CallbackQueryHandler(watermark_position_callback, pattern="^watermark_position$"))
     app.add_handler(CallbackQueryHandler(watermark_opacity_callback, pattern="^watermark_opacity$"))
     app.add_handler(CallbackQueryHandler(watermark_font_size_callback, pattern="^watermark_font_size$"))
-    app.add_handler(CallbackQueryHandler(watermark_preview_prompt, pattern="^watermark_preview$"))
     
     # Position and opacity set handlers
     app.add_handler(CallbackQueryHandler(watermark_position_set_callback, pattern="^watermark_pos_"))
@@ -576,12 +437,6 @@ def register_watermark_handlers(app):
         filters.TEXT & ~filters.COMMAND,
         handle_watermark_text_input
     ), group=21)
-    
-    # Preview video handler
-    app.add_handler(MessageHandler(
-        filters.VIDEO,
-        handle_watermark_preview_video
-    ), group=22)
     
     # Cancel command handler
     app.add_handler(CommandHandler("cancel", cancel_watermark_setup))
