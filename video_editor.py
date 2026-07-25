@@ -65,11 +65,10 @@ class VideoEditor:
             # Margin from edges
             margin = 20
             
-            # Position mapping - FIXED
             img_width = img.size[0]
             img_height = img.size[1]
             
-            # Calculate x, y based on position
+            # Position mapping - CLEAN IF-ELIF
             if position == "top-left":
                 x = margin
                 y = margin
@@ -90,7 +89,7 @@ class VideoEditor:
                 x = img_width - text_width - margin
                 y = img_height - text_height - margin
             
-            logger.info(f"📍 Position: {position}, Text size: {text_width}x{text_height}, Image: {img_width}x{img_height}, Position: ({x}, {y})")
+            logger.info(f"📍 Position: {position}, Text: {watermark_text[:20]}..., Image: {img_width}x{img_height}, Position: ({x}, {y})")
             
             # Opacity (0-255)
             alpha = int(opacity * 255)
