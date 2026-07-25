@@ -258,7 +258,6 @@ async def watermark_position_set_callback(update: Update, context: ContextTypes.
     save_watermark_settings(user_id, settings)
     
     await query.answer(f"✅ Position: {position.replace('-', ' ').title()}")
-    # ✅ Return to position selection menu
     await watermark_position_callback(update, context)
 
 # ═══════════════════════════════════════════════════════
@@ -418,7 +417,7 @@ async def cancel_watermark_setup(update: Update, context: ContextTypes.DEFAULT_T
 def register_watermark_handlers(app):
     """Register all watermark-related handlers with the bot application"""
     
-    # ⚠️ IMPORTANT: Pattern exact match karo
+    # Main watermark menu handler
     app.add_handler(CallbackQueryHandler(watermark_menu_callback, pattern="^watermark_settings$"))
     
     app.add_handler(CallbackQueryHandler(watermark_toggle_callback, pattern="^watermark_toggle$"))
