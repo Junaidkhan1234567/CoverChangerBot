@@ -25,8 +25,10 @@ from database import (
     format_log_message, log_new_user, log_user_banned, log_user_unbanned,
     log_thumbnail_set, log_thumbnail_removed,
     is_user_exists,
-    is_user_verified,        # 👈 YEH ADD KARO
-    set_user_verified        # 👈 YEH ADD KARO
+    is_user_verified,
+    set_user_verified,
+    get_watermark_settings,  # NEW IMPORT
+    save_watermark_settings   # NEW IMPORT
 )
 from telegram import MessageEntity
 from flask import Flask
@@ -44,6 +46,10 @@ from channel import (
     should_forward_to_channel
 )
 # ═══════════════════════════════════════════════════════
+
+# ═══════════════════ WATERMARK IMPORTS ═══════════════════
+from watermark import register_watermark_handlers, get_watermark_settings, save_watermark_settings
+from video_editor import video_editor
 
 # ✅ LOG UTILS IMPORT
 from log_utils import (
@@ -66,13 +72,11 @@ def run_flask():
 threading.Thread(target=run_flask, daemon=True).start()
 
 def bold_entities(text: str):
-    """Return entities list to make full caption bold"""
     if not text:
         return None
     return [MessageEntity(type="bold", offset=0, length=len(text))]
 
 def get_ist_datetime_str():
-    """Returns current IST datetime as formatted string"""
     ist = pytz.timezone('Asia/Kolkata')
     now = datetime.now(ist)
     return now.strftime("%I:%M:%S %p")
@@ -220,11 +224,9 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     if not FORCE_SUB_CHANNEL_ID:
         return True
 
-    # 🔥 Database se check karo - permanent storage
     is_verified = is_user_verified(user_id)
     
     if is_verified:
-        # Verify user is still a member of the channel
         try:
             channel_id_str = str(FORCE_SUB_CHANNEL_ID).strip()
             try:
@@ -244,16 +246,13 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
                 logger.info(f"✅ User {user_id} is still a member - access granted")
                 return True
             
-            # User left the channel - remove verification
             logger.warning(f"⚠️ User {user_id} left the channel - removing verification")
             set_user_verified(user_id, False)
             
         except Exception as e:
             logger.warning(f"Could not verify membership for user {user_id}: {e}")
-            # Agar error aata hai toh allow karein
             return True
     
-    # 🔒 User not verified - show join prompt
     logger.info(f"🔒 User {user_id} not verified - showing join prompt")
 
     try:
@@ -384,7 +383,6 @@ async def check_force_sub(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
 
 async def send_home_menu(context, chat_id: int, user_id: int = None):
-    """Helper function to send home menu with banner - SAME TEXT AS /start"""
     text = (
         "<b>Welcome to Cover Changer Bot ✅</b>\n\n"
         "• Send/forward Image → Save cover\n"
@@ -466,7 +464,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     # ════════════════════════════════════════════════════════════════
     
-    # ✅ OLD MESSAGE DELETE KARO
     try:
         await query.message.delete()
     except Exception:
@@ -686,7 +683,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         key = query.data.split("menu_")[1]
         logger.info(f"📋 Menu callback: {key} for user {user_id}")
         
-        # ✅ menu_back - DIRECT HOME MENU (BANNER KE SAATH)
         if key == "back":
             await send_home_menu(context, user_id, user_id)
             return
@@ -753,6 +749,7 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             settings_kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
                 [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
+                [InlineKeyboardButton("🎨 Watermark", callback_data="watermark_settings")],
                 [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
             ])
             await context.bot.send_message(
@@ -901,7 +898,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
     
-    # ✅ MENU_BACK - DIRECT HOME MENU WITH BANNER (SAME TEXT AS /start)
     if query.data == "menu_back":
         await send_home_menu(context, user_id, user_id)
         return
@@ -933,7 +929,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     first_name = update.effective_user.first_name or "User"
     
-    # ✅ DATABASE SE CHECK KARO - ONLY NEW USERS GET LOG
     is_new_user = not is_user_exists(user_id)
     
     if is_new_user:
@@ -1076,6 +1071,7 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     settings_kb = InlineKeyboardMarkup([
         [InlineKeyboardButton("🖼️ Thumbnails", callback_data="submenu_thumbnails")],
         [InlineKeyboardButton("📢 ᴀᴅᴅ ʏᴏᴜʀ ᴄʜᴀɴɴᴇʟ", callback_data="channel_set")],
+        [InlineKeyboardButton("🎨 Watermark", callback_data="watermark_settings")],
         [InlineKeyboardButton("⬅️ Back", callback_data="menu_back")]
     ])
     await update.message.reply_text(text, reply_markup=settings_kb, parse_mode="HTML")
@@ -1148,10 +1144,19 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "No Username"
+    first_name = update.message.from_user.first_name or "User"
     cover = get_thumbnail(user_id)
     
     if not cover:
         return await update.message.reply_text("❌ No thumbnail found\n\nSend a photo to save thumbnail first", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    
+    # ✅ WATERMARK SETTINGS GET KARO
+    watermark_settings = get_watermark_settings(user_id)
+    watermark_enabled = watermark_settings.get("enabled", False)
+    watermark_text = watermark_settings.get("text", "© Cover Bot")
+    watermark_position = watermark_settings.get("position", "bottom-right")
+    watermark_opacity = watermark_settings.get("opacity", 0.7)
+    watermark_font_size = watermark_settings.get("font_size", 30)
     
     try:
         await log_video_processed(
@@ -1178,11 +1183,67 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     logger.info(f"📌 User {user_id} - Channel: {saved_channel}, Forward Enabled: {forward_enabled}")
     
+    # ═══════════════════════════════════════════════════════
+    # 🎯 WATERMARK APPLY KARO - THUMBNAIL PAR
+    # ═══════════════════════════════════════════════════════
+    
+    final_thumbnail_id = cover
+    
+    if watermark_enabled and watermark_text:
+        try:
+            logger.info(f"💧 Applying watermark to thumbnail for user {user_id}")
+            
+            thumbnail_file = await context.bot.get_file(cover)
+            
+            temp_thumb_path = os.path.join(video_editor.temp_dir, f"thumb_{user_id}_{int(datetime.now().timestamp())}.jpg")
+            await thumbnail_file.download_to_drive(temp_thumb_path)
+            
+            user_info = {
+                'username': username,
+                'first_name': first_name
+            }
+            
+            watermarked_thumb_path = video_editor.add_watermark_to_thumbnail(
+                thumbnail_path=temp_thumb_path,
+                watermark_text=watermark_text,
+                position=watermark_position,
+                opacity=watermark_opacity,
+                font_size=watermark_font_size,
+                user_info=user_info
+            )
+            
+            if watermarked_thumb_path and os.path.exists(watermarked_thumb_path):
+                with open(watermarked_thumb_path, 'rb') as f:
+                    watermarked_msg = await context.bot.send_photo(
+                        chat_id=update.effective_chat.id,
+                        photo=InputFile(f),
+                        caption="🖼️ Watermarked Thumbnail Preview"
+                    )
+                    final_thumbnail_id = watermarked_msg.photo[-1].file_id
+                    logger.info(f"✅ Watermarked thumbnail uploaded for user {user_id}")
+                    
+                    try:
+                        os.remove(temp_thumb_path)
+                        os.remove(watermarked_thumb_path)
+                    except:
+                        pass
+            else:
+                logger.warning(f"⚠️ Watermark failed, using original thumbnail")
+                final_thumbnail_id = cover
+                
+        except Exception as e:
+            logger.error(f"❌ Watermark apply error: {e}")
+            final_thumbnail_id = cover
+    
+    # ═══════════════════════════════════════════════════════
+    # 📤 VIDEO SEND KARO - WATERMARKED THUMBNAIL KE SAATH
+    # ═══════════════════════════════════════════════════════
+    
     media = InputMediaVideo(
         media=video, 
         caption=clean_caption,
         supports_streaming=True, 
-        cover=cover
+        cover=final_thumbnail_id
     )
     
     try:
@@ -1191,7 +1252,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message_id=msg.message_id, 
             media=media
         )
-        logger.info(f"✅ Video sent to user {user_id} with cover")
+        logger.info(f"✅ Video sent to user {user_id} with {'watermarked' if watermark_enabled else 'original'} cover")
         
         if saved_channel and forward_enabled:
             try:
@@ -1199,17 +1260,17 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     media=video,
                     caption=f" {clean_caption or 'No caption'}",
                     supports_streaming=True,
-                    cover=cover
+                    cover=final_thumbnail_id
                 )
                 
                 await context.bot.send_media_group(
                     chat_id=saved_channel,
                     media=[channel_media]
                 )
-                logger.info(f"✅ Video sent to saved channel {saved_channel} with cover")
+                logger.info(f"✅ Video sent to saved channel {saved_channel} with watermarked cover")
                 
                 await update.message.reply_text(
-                    f"✅ Video sent to your channel with cover!",
+                    f"✅ Video sent to your channel with {'watermarked' if watermark_enabled else ''} cover!",
                     parse_mode="HTML"
                 )
                 
@@ -1227,24 +1288,15 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                         parse_mode="HTML"
                     )
                     logger.info(f"✅ Video sent without cover to channel {saved_channel}")
-                    await update.message.reply_text(
-                        f"⚠️ Video sent but cover couldn't be applied to channel",
-                        parse_mode="HTML"
-                    )
                 except Exception as e2:
                     logger.error(f"❌ Error sending video without cover: {e2}")
-                    await update.message.reply_text(
-                        f"⚠️ Video couldn't be sent to channel\n\nError: {str(e2)[:100]}",
-                        parse_mode="HTML"
-                    )
+                    
         elif saved_channel and not forward_enabled:
-            logger.info(f"ℹ️ Forwarding disabled for user {user_id}, not sending to channel")
+            logger.info(f"ℹ️ Forwarding disabled for user {user_id}")
             await update.message.reply_text(
-                f"ℹ️ Forward OFF\n",
+                f"ℹ️ Forward OFF",
                 parse_mode="HTML"
             )
-        elif not saved_channel:
-            logger.info(f"ℹ️ No channel set for user {user_id}")
         
         if LOG_CHANNEL_ID:
             try:
@@ -1255,6 +1307,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     f"📝 Caption: {clean_caption or 'No caption'}\n"
                     f"📢 Channel: {saved_channel or 'Not set'}\n"
                     f"📤 Forward: {'✅ Enabled' if forward_enabled else '❌ Disabled'}\n"
+                    f"💧 Watermark: {'✅ Enabled' if watermark_enabled else '❌ Disabled'}\n"
                     f"⏰ Time: {update.message.date}"
                 )
                 await context.bot.send_video(
@@ -1262,7 +1315,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     video=video,
                     caption=log_caption,
                     supports_streaming=True,
-                    thumbnail=cover,
+                    thumbnail=final_thumbnail_id,
                     parse_mode="HTML"
                 )
                 logger.debug(f"✅ Video logged to channel")
@@ -1566,7 +1619,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 """-----------MAIN FUNCTION-----------"""
 
 async def post_init(app: Application):
-    """Bot start/deploy hone par simple log bhejega"""
     logger.info("🚀 Bot is starting up...")
     
     if LOG_CHANNEL_ID:
@@ -1620,6 +1672,7 @@ def main() -> None:
     app.post_init = post_init
 
     register_channel_handlers(app)
+    register_watermark_handlers(app)  # ✅ WATERMARK HANDLERS REGISTER
 
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
