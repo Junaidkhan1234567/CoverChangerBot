@@ -1,4 +1,3 @@
-# video_editor.py - Lightweight version using only Pillow
 import os
 import logging
 import tempfile
@@ -80,7 +79,7 @@ class VideoEditor:
             img_width = img.size[0]
             img_height = img.size[1]
             
-            # Position mapping
+            # Position mapping - MIDDLE BOTTOM ADDED
             if position == "top-left":
                 x = margin
                 y = margin
@@ -96,7 +95,12 @@ class VideoEditor:
             elif position == "center":
                 x = (img_width - text_width) // 2
                 y = (img_height - text_height) // 2
+            elif position == "middle-bottom":
+                # ✅ MIDDLE BOTTOM - Center horizontally, bottom with margin
+                x = (img_width - text_width) // 2
+                y = img_height - text_height - margin
             else:
+                # Default: bottom-right
                 x = img_width - text_width - margin
                 y = img_height - text_height - margin
             
