@@ -1,4 +1,4 @@
-# video_editor.py - Lightweight version
+# video_editor.py - Lightweight version using only Pillow
 import os
 import logging
 import tempfile
@@ -17,15 +17,22 @@ class VideoEditor:
     def add_watermark_to_thumbnail(self, thumbnail_path: str, watermark_text: str = None, 
                                    position: str = "bottom-right", opacity: float = 0.7, 
                                    font_size: int = 30, user_info: dict = None) -> str:
+        """
+        Add watermark to video thumbnail/cover image using Pillow only
+        """
         try:
             if not os.path.exists(thumbnail_path):
                 logger.error(f"❌ Thumbnail not found: {thumbnail_path}")
                 return thumbnail_path
             
+            # Load thumbnail image
             img = Image.open(thumbnail_path).convert("RGBA")
+            
+            # Create watermark layer
             watermark = Image.new("RGBA", img.size, (0, 0, 0, 0))
             draw = ImageDraw.Draw(watermark)
             
+            # Process watermark text with variables
             if watermark_text:
                 if user_info:
                     username = user_info.get('username', 'User')
@@ -38,8 +45,10 @@ class VideoEditor:
             else:
                 watermark_text = "© Cover Bot"
             
+            # Calculate font size based on image size
             font_size = max(16, min(img.size[0] // 20, 60))
             
+            # Try to load font
             try:
                 font = ImageFont.truetype("arial.ttf", font_size)
             except:
@@ -48,6 +57,7 @@ class VideoEditor:
                 except:
                     font = ImageFont.load_default()
             
+            # Calculate text position
             bbox = draw.textbbox((0, 0), watermark_text, font=font)
             text_width = bbox[2] - bbox[0]
             text_height = bbox[3] - bbox[1]
@@ -63,14 +73,34 @@ class VideoEditor:
             }
             
             x, y = pos_map.get(position, pos_map["bottom-right"])
+            
+            # Opacity (0-255)
             alpha = int(opacity * 255)
             
-            draw.text((x + 2, y + 2), watermark_text, font=font, fill=(0, 0, 0, alpha // 2))
-            draw.text((x, y), watermark_text, font=font, fill=(255, 255, 255, alpha))
+            # Draw shadow for better visibility
+            shadow_offset = 2
+            draw.text(
+                (x + shadow_offset, y + shadow_offset),
+                watermark_text,
+                font=font,
+                fill=(0, 0, 0, alpha // 2)
+            )
             
+            # Draw main text
+            draw.text(
+                (x, y),
+                watermark_text,
+                font=font,
+                fill=(255, 255, 255, alpha)
+            )
+            
+            # Composite images
             combined = Image.alpha_composite(img, watermark)
+            
+            # Convert back to RGB
             combined = combined.convert("RGB")
             
+            # Save with same quality
             output_path = os.path.join(self.temp_dir, f"watermarked_thumb_{int(datetime.now().timestamp())}.jpg")
             combined.save(output_path, quality=95)
             
@@ -89,4 +119,5 @@ class VideoEditor:
         except Exception as e:
             logger.error(f"❌ Cleanup error: {e}")
 
+# Global instance
 video_editor = VideoEditor()
