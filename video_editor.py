@@ -45,15 +45,22 @@ class VideoEditor:
             else:
                 watermark_text = "© Cover Bot"
             
-            # Calculate font size based on image size
-            font_size = max(16, min(img.size[0] // 20, 60))
+            # ✅ USE USER SELECTED FONT SIZE
+            # Agar user ne font size set kiya hai toh use karo, nahi toh auto-calculate
+            if font_size and font_size > 0:
+                final_font_size = font_size
+            else:
+                # Auto calculate based on image size
+                final_font_size = max(16, min(img.size[0] // 20, 60))
             
-            # Try to load font
+            logger.info(f"📏 Font size: {final_font_size}px (User selected: {font_size})")
+            
+            # Try to load font with selected size
             try:
-                font = ImageFont.truetype("arial.ttf", font_size)
+                font = ImageFont.truetype("arial.ttf", final_font_size)
             except:
                 try:
-                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
+                    font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", final_font_size)
                 except:
                     font = ImageFont.load_default()
             
@@ -68,7 +75,7 @@ class VideoEditor:
             img_width = img.size[0]
             img_height = img.size[1]
             
-            # Position mapping - CLEAN IF-ELIF
+            # Position mapping
             if position == "top-left":
                 x = margin
                 y = margin
@@ -89,7 +96,7 @@ class VideoEditor:
                 x = img_width - text_width - margin
                 y = img_height - text_height - margin
             
-            logger.info(f"📍 Position: {position}, Text: {watermark_text[:20]}..., Image: {img_width}x{img_height}, Position: ({x}, {y})")
+            logger.info(f"📍 Position: {position}, Font: {final_font_size}px, Image: {img_width}x{img_height}, Position: ({x}, {y})")
             
             # Opacity (0-255)
             alpha = int(opacity * 255)
