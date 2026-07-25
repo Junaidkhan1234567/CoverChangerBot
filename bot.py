@@ -27,8 +27,8 @@ from database import (
     is_user_exists,
     is_user_verified,
     set_user_verified,
-    get_watermark_settings,  # NEW IMPORT
-    save_watermark_settings   # NEW IMPORT
+    get_watermark_settings,
+    save_watermark_settings
 )
 from telegram import MessageEntity
 from flask import Flask
@@ -48,7 +48,7 @@ from channel import (
 # ═══════════════════════════════════════════════════════
 
 # ═══════════════════ WATERMARK IMPORTS ═══════════════════
-from watermark import register_watermark_handlers, get_watermark_settings, save_watermark_settings
+from watermark import register_watermark_handlers
 from video_editor import video_editor
 
 # ✅ LOG UTILS IMPORT
@@ -1150,7 +1150,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not cover:
         return await update.message.reply_text("❌ No thumbnail found\n\nSend a photo to save thumbnail first", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
-    # ✅ WATERMARK SETTINGS GET KARO
+    # ✅ WATERMARK SETTINGS
     watermark_settings = get_watermark_settings(user_id)
     watermark_enabled = watermark_settings.get("enabled", False)
     watermark_text = watermark_settings.get("text", "© Cover Bot")
@@ -1158,18 +1158,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     watermark_opacity = watermark_settings.get("opacity", 0.7)
     watermark_font_size = watermark_settings.get("font_size", 30)
     
-    try:
-        await log_video_processed(
-            context.bot,
-            LOG_CHANNEL_ID,
-            user_id,
-            username
-        )
-        logger.info(f"✅ Video log sent for user {user_id}")
-    except Exception as e:
-        logger.error(f"❌ Video log failed: {e}")
-    
-    msg = await update.message.reply_text("⏳ Processing video\n\nPlease wait a few seconds", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    msg = await update.message.reply_text("⏳ Processing video...", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
     video = update.message.video.file_id
     original_caption = update.message.caption or ""
@@ -1181,20 +1170,22 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     saved_channel = get_user_channel(user_id)
     forward_enabled = should_forward_to_channel(user_id)
     
-    logger.info(f"📌 User {user_id} - Channel: {saved_channel}, Forward Enabled: {forward_enabled}")
-    
     # ═══════════════════════════════════════════════════════
-    # 🎯 WATERMARK APPLY KARO - THUMBNAIL PAR
+    # FINAL THUMBNAIL - DEFAULT COVER
     # ═══════════════════════════════════════════════════════
     
     final_thumbnail_id = cover
     
+    # ═══════════════════════════════════════════════════════
+    # WATERMARK APPLY - SIRF AGAR ENABLED HO
+    # ═══════════════════════════════════════════════════════
+    
     if watermark_enabled and watermark_text:
         try:
-            logger.info(f"💧 Applying watermark to thumbnail for user {user_id}")
+            logger.info(f"💧 Applying watermark for user {user_id}")
             
+            # Get thumbnail file
             thumbnail_file = await context.bot.get_file(cover)
-            
             temp_thumb_path = os.path.join(video_editor.temp_dir, f"thumb_{user_id}_{int(datetime.now().timestamp())}.jpg")
             await thumbnail_file.download_to_drive(temp_thumb_path)
             
@@ -1203,6 +1194,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'first_name': first_name
             }
             
+            # Apply watermark
             watermarked_thumb_path = video_editor.add_watermark_to_thumbnail(
                 thumbnail_path=temp_thumb_path,
                 watermark_text=watermark_text,
@@ -1213,30 +1205,40 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             
             if watermarked_thumb_path and os.path.exists(watermarked_thumb_path):
+                # Upload watermarked thumbnail to Telegram
                 with open(watermarked_thumb_path, 'rb') as f:
                     watermarked_msg = await context.bot.send_photo(
                         chat_id=update.effective_chat.id,
-                        photo=InputFile(f),
-                        caption="🖼️ Watermarked Thumbnail Preview"
+                        photo=InputFile(f)
                     )
                     final_thumbnail_id = watermarked_msg.photo[-1].file_id
-                    logger.info(f"✅ Watermarked thumbnail uploaded for user {user_id}")
+                    logger.info(f"✅ Watermarked thumbnail uploaded")
                     
+                    # Cleanup temp files
                     try:
                         os.remove(temp_thumb_path)
                         os.remove(watermarked_thumb_path)
                     except:
                         pass
+                    
+                    # ✅ DELETE THE WATERMARK PREVIEW PHOTO - SO IT DOESN'T SHOW TO USER
+                    try:
+                        await context.bot.delete_message(
+                            chat_id=update.effective_chat.id,
+                            message_id=watermarked_msg.message_id
+                        )
+                        logger.info(f"✅ Deleted watermark preview photo")
+                    except Exception as e:
+                        logger.warning(f"Could not delete preview photo: {e}")
             else:
-                logger.warning(f"⚠️ Watermark failed, using original thumbnail")
                 final_thumbnail_id = cover
                 
         except Exception as e:
-            logger.error(f"❌ Watermark apply error: {e}")
+            logger.error(f"❌ Watermark error: {e}")
             final_thumbnail_id = cover
     
     # ═══════════════════════════════════════════════════════
-    # 📤 VIDEO SEND KARO - WATERMARKED THUMBNAIL KE SAATH
+    # 🚀 VIDEO SEND - INSTANT
     # ═══════════════════════════════════════════════════════
     
     media = InputMediaVideo(
@@ -1252,8 +1254,9 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             message_id=msg.message_id, 
             media=media
         )
-        logger.info(f"✅ Video sent to user {user_id} with {'watermarked' if watermark_enabled else 'original'} cover")
+        logger.info(f"✅ Video sent to user {user_id}")
         
+        # Channel forward
         if saved_channel and forward_enabled:
             try:
                 channel_media = InputMediaVideo(
@@ -1262,72 +1265,21 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     supports_streaming=True,
                     cover=final_thumbnail_id
                 )
-                
                 await context.bot.send_media_group(
                     chat_id=saved_channel,
                     media=[channel_media]
                 )
-                logger.info(f"✅ Video sent to saved channel {saved_channel} with watermarked cover")
-                
-                await update.message.reply_text(
-                    f"✅ Video sent to your channel with {'watermarked' if watermark_enabled else ''} cover!",
-                    parse_mode="HTML"
-                )
-                
+                logger.info(f"✅ Video sent to channel {saved_channel}")
             except Exception as e:
-                logger.error(f"❌ Error sending video to channel: {e}")
-                
-                try:
-                    await context.bot.send_video(
-                        chat_id=saved_channel,
-                        video=video,
-                        caption=f"📺 <b>Video from user</b>\n\n"
-                                f"👤 User: @{username}\n"
-                                f"📝 Caption: {clean_caption or 'No caption'}",
-                        supports_streaming=True,
-                        parse_mode="HTML"
-                    )
-                    logger.info(f"✅ Video sent without cover to channel {saved_channel}")
-                except Exception as e2:
-                    logger.error(f"❌ Error sending video without cover: {e2}")
-                    
-        elif saved_channel and not forward_enabled:
-            logger.info(f"ℹ️ Forwarding disabled for user {user_id}")
-            await update.message.reply_text(
-                f"ℹ️ Forward OFF",
-                parse_mode="HTML"
-            )
-        
-        if LOG_CHANNEL_ID:
-            try:
-                log_caption = (
-                    f"🎬 <b>Video Processing Completed</b>\n\n"
-                    f"👤 User ID: <code>{user_id}</code>\n"
-                    f"📌 Username: @{username}\n"
-                    f"📝 Caption: {clean_caption or 'No caption'}\n"
-                    f"📢 Channel: {saved_channel or 'Not set'}\n"
-                    f"📤 Forward: {'✅ Enabled' if forward_enabled else '❌ Disabled'}\n"
-                    f"💧 Watermark: {'✅ Enabled' if watermark_enabled else '❌ Disabled'}\n"
-                    f"⏰ Time: {update.message.date}"
-                )
-                await context.bot.send_video(
-                    chat_id=LOG_CHANNEL_ID,
-                    video=video,
-                    caption=log_caption,
-                    supports_streaming=True,
-                    thumbnail=final_thumbnail_id,
-                    parse_mode="HTML"
-                )
-                logger.debug(f"✅ Video logged to channel")
-            except Exception as e:
-                logger.error(f"❌ Error forwarding video to log channel: {e}")
+                logger.error(f"❌ Channel error: {e}")
                 
     except Exception as e:
-        logger.error(f"❌ Video processing error: {e}")
+        logger.error(f"❌ Video error: {e}")
         await update.message.reply_text(
             f"❌ Processing failed\n\nError: {str(e)[:100]}", 
             parse_mode="HTML"
         )
+
 
 async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
