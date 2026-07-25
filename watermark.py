@@ -384,6 +384,8 @@ async def watermark_font_size_set_callback(update: Update, context: ContextTypes
     save_watermark_settings(user_id, settings)
     
     await query.answer(f"✅ Font Size: {font_size}px")
+    
+    # ✅ Return to font size selection menu with updated current selection
     await watermark_font_size_callback(update, context)
 
 # ═══════════════════════════════════════════════════════
