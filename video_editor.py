@@ -16,9 +16,12 @@ class VideoEditor:
     
     def add_watermark_to_thumbnail(self, thumbnail_path: str, watermark_text: str = None, 
                                    position: str = "bottom-right", opacity: float = 0.7, 
-                                   font_size: int = 30, user_info: dict = None) -> str:
+                                   font_size: int = 30, user_info: dict = None,
+                                   text_color: str = "#FFFFFF", shadow_color: str = "#000000") -> str:
         """
         Add watermark to video thumbnail/cover image using Pillow only
+        text_color: Hex color code like #FFFFFF (white), #FF0000 (red), etc.
+        shadow_color: Hex color code for shadow
         """
         try:
             if not os.path.exists(thumbnail_path):
@@ -45,12 +48,10 @@ class VideoEditor:
             else:
                 watermark_text = "© Cover Bot"
             
-            # ✅ USE USER SELECTED FONT SIZE
-            # Agar user ne font size set kiya hai toh use karo, nahi toh auto-calculate
+            # Use user selected font size
             if font_size and font_size > 0:
                 final_font_size = font_size
             else:
-                # Auto calculate based on image size
                 final_font_size = max(16, min(img.size[0] // 20, 60))
             
             logger.info(f"📏 Font size: {final_font_size}px (User selected: {font_size})")
@@ -63,6 +64,10 @@ class VideoEditor:
                     font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", final_font_size)
                 except:
                     font = ImageFont.load_default()
+            
+            # Parse color hex to RGB
+            text_rgb = self._hex_to_rgb(text_color)
+            shadow_rgb = self._hex_to_rgb(shadow_color)
             
             # Get text size using textbbox
             bbox = draw.textbbox((0, 0), watermark_text, font=font)
@@ -92,11 +97,10 @@ class VideoEditor:
                 x = (img_width - text_width) // 2
                 y = (img_height - text_height) // 2
             else:
-                # Default: bottom-right
                 x = img_width - text_width - margin
                 y = img_height - text_height - margin
             
-            logger.info(f"📍 Position: {position}, Font: {final_font_size}px, Image: {img_width}x{img_height}, Position: ({x}, {y})")
+            logger.info(f"📍 Position: {position}, Font: {final_font_size}px, Color: {text_color}, Image: {img_width}x{img_height}, Position: ({x}, {y})")
             
             # Opacity (0-255)
             alpha = int(opacity * 255)
@@ -107,15 +111,15 @@ class VideoEditor:
                 (x + shadow_offset, y + shadow_offset),
                 watermark_text,
                 font=font,
-                fill=(0, 0, 0, alpha // 2)
+                fill=(shadow_rgb[0], shadow_rgb[1], shadow_rgb[2], alpha // 2)
             )
             
-            # Draw main text
+            # Draw main text with color
             draw.text(
                 (x, y),
                 watermark_text,
                 font=font,
-                fill=(255, 255, 255, alpha)
+                fill=(text_rgb[0], text_rgb[1], text_rgb[2], alpha)
             )
             
             # Composite images
@@ -134,6 +138,15 @@ class VideoEditor:
         except Exception as e:
             logger.error(f"❌ Watermark thumbnail error: {e}")
             return thumbnail_path
+    
+    def _hex_to_rgb(self, hex_color: str) -> tuple:
+        """Convert hex color to RGB tuple"""
+        hex_color = hex_color.lstrip('#')
+        if len(hex_color) == 3:
+            hex_color = ''.join([c*2 for c in hex_color])
+        if len(hex_color) == 6:
+            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+        return (255, 255, 255)  # Default white
     
     def cleanup(self):
         try:
