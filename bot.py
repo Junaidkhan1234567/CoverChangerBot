@@ -1157,6 +1157,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     watermark_position = watermark_settings.get("position", "bottom-right")
     watermark_opacity = watermark_settings.get("opacity", 0.7)
     watermark_font_size = watermark_settings.get("font_size", 30)
+    watermark_color = watermark_settings.get("color", "#FFFFFF")  # ✅ NEW
+    watermark_shadow = watermark_settings.get("shadow_color", "#000000")  # ✅ NEW
     
     msg = await update.message.reply_text("⏳ Processing video...", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
@@ -1170,21 +1172,12 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     saved_channel = get_user_channel(user_id)
     forward_enabled = should_forward_to_channel(user_id)
     
-    # ═══════════════════════════════════════════════════════
-    # FINAL THUMBNAIL - DEFAULT COVER
-    # ═══════════════════════════════════════════════════════
-    
     final_thumbnail_id = cover
-    
-    # ═══════════════════════════════════════════════════════
-    # WATERMARK APPLY - SIRF AGAR ENABLED HO
-    # ═══════════════════════════════════════════════════════
     
     if watermark_enabled and watermark_text:
         try:
             logger.info(f"💧 Applying watermark for user {user_id}")
             
-            # Get thumbnail file
             thumbnail_file = await context.bot.get_file(cover)
             temp_thumb_path = os.path.join(video_editor.temp_dir, f"thumb_{user_id}_{int(datetime.now().timestamp())}.jpg")
             await thumbnail_file.download_to_drive(temp_thumb_path)
@@ -1194,18 +1187,19 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'first_name': first_name
             }
             
-            # Apply watermark
+            # Apply watermark with color
             watermarked_thumb_path = video_editor.add_watermark_to_thumbnail(
                 thumbnail_path=temp_thumb_path,
                 watermark_text=watermark_text,
                 position=watermark_position,
                 opacity=watermark_opacity,
                 font_size=watermark_font_size,
-                user_info=user_info
+                user_info=user_info,
+                text_color=watermark_color,  # ✅ NEW
+                shadow_color=watermark_shadow  # ✅ NEW
             )
             
             if watermarked_thumb_path and os.path.exists(watermarked_thumb_path):
-                # Upload watermarked thumbnail to Telegram
                 with open(watermarked_thumb_path, 'rb') as f:
                     watermarked_msg = await context.bot.send_photo(
                         chat_id=update.effective_chat.id,
@@ -1214,14 +1208,12 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     final_thumbnail_id = watermarked_msg.photo[-1].file_id
                     logger.info(f"✅ Watermarked thumbnail uploaded")
                     
-                    # Cleanup temp files
                     try:
                         os.remove(temp_thumb_path)
                         os.remove(watermarked_thumb_path)
                     except:
                         pass
                     
-                    # ✅ DELETE THE WATERMARK PREVIEW PHOTO - SO IT DOESN'T SHOW TO USER
                     try:
                         await context.bot.delete_message(
                             chat_id=update.effective_chat.id,
@@ -1236,10 +1228,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"❌ Watermark error: {e}")
             final_thumbnail_id = cover
-    
-    # ═══════════════════════════════════════════════════════
-    # 🚀 VIDEO SEND - INSTANT
-    # ═══════════════════════════════════════════════════════
     
     media = InputMediaVideo(
         media=video, 
@@ -1256,7 +1244,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         logger.info(f"✅ Video sent to user {user_id}")
         
-        # Channel forward
         if saved_channel and forward_enabled:
             try:
                 channel_media = InputMediaVideo(
