@@ -24,7 +24,9 @@ def get_watermark_settings(user_id: int) -> dict:
             "text": "© {username} • Cover Bot",
             "position": "bottom-right",
             "opacity": 0.7,
-            "font_size": 30
+            "font_size": 30,
+            "color": "#FFFFFF",
+            "shadow_color": "#000000"
         }
     except Exception as e:
         logger.error(f"Error getting watermark settings: {e}")
@@ -33,7 +35,9 @@ def get_watermark_settings(user_id: int) -> dict:
             "text": "© {username} • Cover Bot",
             "position": "bottom-right",
             "opacity": 0.7,
-            "font_size": 30
+            "font_size": 30,
+            "color": "#FFFFFF",
+            "shadow_color": "#000000"
         }
 
 def save_watermark_settings(user_id: int, settings: dict) -> bool:
@@ -71,7 +75,8 @@ async def watermark_menu_callback(update: Update, context: ContextTypes.DEFAULT_
         f"<b>Text:</b> <code>{settings.get('text', 'Not set') or 'Not set'}</code>\n"
         f"<b>Position:</b> {settings.get('position', 'bottom-right').replace('-', ' ').title()}\n"
         f"<b>Opacity:</b> {int(settings.get('opacity', 0.7) * 100)}%\n"
-        f"<b>Font Size:</b> {settings.get('font_size', 30)}px\n\n"
+        f"<b>Font Size:</b> {settings.get('font_size', 30)}px\n"
+        f"<b>Color:</b> {settings.get('color', '#FFFFFF')}\n\n"
         "👇 <b>Select an option below:</b>"
     )
     
@@ -81,6 +86,7 @@ async def watermark_menu_callback(update: Update, context: ContextTypes.DEFAULT_
         [InlineKeyboardButton("📌 Change Position", callback_data="watermark_position")],
         [InlineKeyboardButton("🎚️ Adjust Opacity", callback_data="watermark_opacity")],
         [InlineKeyboardButton("📏 Font Size", callback_data="watermark_font_size")],
+        [InlineKeyboardButton("🎨 Text Color", callback_data="watermark_color")],
         [InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings")]
     ])
     
@@ -384,9 +390,79 @@ async def watermark_font_size_set_callback(update: Update, context: ContextTypes
     save_watermark_settings(user_id, settings)
     
     await query.answer(f"✅ Font Size: {font_size}px")
-    
-    # ✅ Return to font size selection menu with updated current selection
     await watermark_font_size_callback(update, context)
+
+# ═══════════════════════════════════════════════════════
+# WATERMARK COLOR FUNCTIONS - NEW
+# ═══════════════════════════════════════════════════════
+
+async def watermark_color_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Show color selection"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    settings = get_watermark_settings(user_id)
+    current = settings.get("color", "#FFFFFF")
+    
+    colors = [
+        ("⚪ White", "#FFFFFF"),
+        ("⚫ Black", "#000000"),
+        ("🔴 Red", "#FF0000"),
+        ("🟢 Green", "#00FF00"),
+        ("🔵 Blue", "#0000FF"),
+        ("🟡 Yellow", "#FFFF00"),
+        ("🟣 Purple", "#800080"),
+        ("🟠 Orange", "#FFA500"),
+        ("🔵 Cyan", "#00FFFF"),
+        ("🟣 Pink", "#FF69B4"),
+        ("⚪ Silver", "#C0C0C0"),
+        ("🟤 Gold", "#FFD700"),
+    ]
+    
+    keyboard = []
+    row = []
+    for i, (label, value) in enumerate(colors):
+        is_current = " ✅" if value == current else ""
+        row.append(InlineKeyboardButton(f"{label}{is_current}", callback_data=f"watermark_color_{value.replace('#', '')}"))
+        if len(row) == 3:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    
+    keyboard.append([InlineKeyboardButton("⬅️ Back", callback_data="watermark_settings")])
+    
+    text = (
+        "🎨 <b>Select Text Color</b>\n\n"
+        f"Current: <b>{current}</b>\n\n"
+        "💡 <b>Tip:</b>\n"
+        "• White (#FFFFFF) - Best for dark backgrounds\n"
+        "• Black (#000000) - Best for light backgrounds\n"
+        "• Bright colors - For eye-catching watermark\n\n"
+        "👇 <b>Select a color:</b>"
+    )
+    
+    try:
+        msg = query.message
+        if hasattr(msg, "photo") and msg.photo:
+            await msg.edit_caption(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        else:
+            await msg.edit_text(text, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="HTML")
+        await query.answer()
+    except Exception as e:
+        logger.error(f"Color menu error: {e}")
+
+async def watermark_color_set_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Set watermark color"""
+    query = update.callback_query
+    user_id = query.from_user.id
+    color_hex = "#" + query.data.replace("watermark_color_", "")
+    
+    settings = get_watermark_settings(user_id)
+    settings["color"] = color_hex
+    save_watermark_settings(user_id, settings)
+    
+    await query.answer(f"✅ Color: {color_hex}")
+    await watermark_color_callback(update, context)
 
 # ═══════════════════════════════════════════════════════
 # CANCEL FUNCTION
@@ -427,6 +503,10 @@ def register_watermark_handlers(app):
     app.add_handler(CallbackQueryHandler(watermark_position_callback, pattern="^watermark_position$"))
     app.add_handler(CallbackQueryHandler(watermark_opacity_callback, pattern="^watermark_opacity$"))
     app.add_handler(CallbackQueryHandler(watermark_font_size_callback, pattern="^watermark_font_size$"))
+    
+    # Color handlers - NEW
+    app.add_handler(CallbackQueryHandler(watermark_color_callback, pattern="^watermark_color$"))
+    app.add_handler(CallbackQueryHandler(watermark_color_set_callback, pattern="^watermark_color_"))
     
     app.add_handler(CallbackQueryHandler(watermark_position_set_callback, pattern="^watermark_pos_"))
     app.add_handler(CallbackQueryHandler(watermark_opacity_set_callback, pattern="^watermark_op_"))
