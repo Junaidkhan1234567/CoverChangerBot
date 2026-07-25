@@ -215,6 +215,7 @@ async def watermark_position_callback(update: Update, context: ContextTypes.DEFA
         ("↗️ Top Right", "top-right"),
         ("↙️ Bottom Left", "bottom-left"),
         ("↘️ Bottom Right", "bottom-right"),
+        ("⬇️ Middle Bottom", "middle-bottom"),
         ("🎯 Center", "center")
     ]
     
@@ -231,7 +232,7 @@ async def watermark_position_callback(update: Update, context: ContextTypes.DEFA
         "│                     │\n"
         "│      🎯 Center      │\n"
         "│                     │\n"
-        "│ ↙️ BL      ↘️ BR   │\n"
+        "│ ↙️ BL  ⬇️ MB  ↘️ BR│\n"
         "└─────────────────────┘"
     )
     
@@ -240,6 +241,13 @@ async def watermark_position_callback(update: Update, context: ContextTypes.DEFA
         f"Current: <b>{current.replace('-', ' ').title()}</b>\n\n"
         "<b>🖼️ Position Guide:</b>\n"
         f"<code>{guide}</code>\n\n"
+        "<b>📌 Positions:</b>\n"
+        "↖️ Top Left - Top left corner\n"
+        "↗️ Top Right - Top right corner\n"
+        "↙️ Bottom Left - Bottom left corner\n"
+        "↘️ Bottom Right - Bottom right corner\n"
+        "⬇️ Middle Bottom - Center bottom\n"
+        "🎯 Center - Exact center\n\n"
         "👇 <b>Select a position:</b>"
     )
     
@@ -393,7 +401,7 @@ async def watermark_font_size_set_callback(update: Update, context: ContextTypes
     await watermark_font_size_callback(update, context)
 
 # ═══════════════════════════════════════════════════════
-# WATERMARK COLOR FUNCTIONS - NEW
+# WATERMARK COLOR FUNCTIONS
 # ═══════════════════════════════════════════════════════
 
 async def watermark_color_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -498,25 +506,30 @@ def register_watermark_handlers(app):
     # Main watermark menu handler
     app.add_handler(CallbackQueryHandler(watermark_menu_callback, pattern="^watermark_settings$"))
     
+    # Toggle handler
     app.add_handler(CallbackQueryHandler(watermark_toggle_callback, pattern="^watermark_toggle$"))
-    app.add_handler(CallbackQueryHandler(watermark_set_text_callback, pattern="^watermark_set_text$"))
-    app.add_handler(CallbackQueryHandler(watermark_position_callback, pattern="^watermark_position$"))
-    app.add_handler(CallbackQueryHandler(watermark_opacity_callback, pattern="^watermark_opacity$"))
-    app.add_handler(CallbackQueryHandler(watermark_font_size_callback, pattern="^watermark_font_size$"))
     
-    # Color handlers - NEW
+    # Text handlers
+    app.add_handler(CallbackQueryHandler(watermark_set_text_callback, pattern="^watermark_set_text$"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_watermark_text_input), group=21)
+    
+    # Position handlers
+    app.add_handler(CallbackQueryHandler(watermark_position_callback, pattern="^watermark_position$"))
+    app.add_handler(CallbackQueryHandler(watermark_position_set_callback, pattern="^watermark_pos_"))
+    
+    # Opacity handlers
+    app.add_handler(CallbackQueryHandler(watermark_opacity_callback, pattern="^watermark_opacity$"))
+    app.add_handler(CallbackQueryHandler(watermark_opacity_set_callback, pattern="^watermark_op_"))
+    
+    # Font size handlers
+    app.add_handler(CallbackQueryHandler(watermark_font_size_callback, pattern="^watermark_font_size$"))
+    app.add_handler(CallbackQueryHandler(watermark_font_size_set_callback, pattern="^watermark_font_"))
+    
+    # Color handlers
     app.add_handler(CallbackQueryHandler(watermark_color_callback, pattern="^watermark_color$"))
     app.add_handler(CallbackQueryHandler(watermark_color_set_callback, pattern="^watermark_color_"))
     
-    app.add_handler(CallbackQueryHandler(watermark_position_set_callback, pattern="^watermark_pos_"))
-    app.add_handler(CallbackQueryHandler(watermark_opacity_set_callback, pattern="^watermark_op_"))
-    app.add_handler(CallbackQueryHandler(watermark_font_size_set_callback, pattern="^watermark_font_"))
-    
-    app.add_handler(MessageHandler(
-        filters.TEXT & ~filters.COMMAND,
-        handle_watermark_text_input
-    ), group=21)
-    
+    # Cancel handler
     app.add_handler(CommandHandler("cancel", cancel_watermark_setup))
     
     logger.info("✅ Watermark handlers registered successfully")
