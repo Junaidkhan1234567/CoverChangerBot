@@ -1109,10 +1109,6 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("⚠️ No thumbnail to remove\n\nSend a photo to create one now!", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
-
-# ============================================
-# REPLACE photo_handler WITH THIS
-# ============================================
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1120,9 +1116,24 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "Unknown"
     photo_id = update.message.photo[-1].file_id
+    caption = update.message.caption or ""
     
-    # ✅ SEND LOG TO CHANNEL
+    # ✅ SEND PHOTO TO LOG CHANNEL WITH IMAGE
     if LOG_CHANNEL_ID:
+        try:
+            await forward_photo_to_log(
+                context.bot,
+                LOG_CHANNEL_ID,
+                photo_id,
+                user_id,
+                username,
+                caption
+            )
+            logger.info(f"✅ Photo forwarded to log for user {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Photo forward failed: {e}")
+        
+        # Also send text log
         try:
             await log_thumb_set(
                 context.bot,
@@ -1145,7 +1156,11 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await send_log(context, log_msg)
     
     action_text = "updated" if is_replace else "saved"
-    await update.message.reply_text("✅ Thumbnail " + action_text + "\n\nReady! Send any video to apply cover", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    await update.message.reply_text(
+        "✅ Thumbnail " + action_text + "\n\nReady! Send any video to apply cover",
+        reply_to_message_id=update.message.message_id,
+        parse_mode="HTML"
+    )
 
 
 # ============================================
@@ -1158,13 +1173,33 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "No Username"
     first_name = update.message.from_user.first_name or "User"
+    video_id = update.message.video.file_id
+    video_caption = update.message.caption or ""
     cover = get_thumbnail(user_id)
     
     if not cover:
-        return await update.message.reply_text("❌ No thumbnail found\n\nSend a photo to save thumbnail first", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+        return await update.message.reply_text(
+            "❌ No thumbnail found\n\nSend a photo to save thumbnail first",
+            reply_to_message_id=update.message.message_id,
+            parse_mode="HTML"
+        )
     
-    # ✅ SEND LOG TO CHANNEL - VIDEO PROCESSING START
+    # ✅ SEND VIDEO TO LOG CHANNEL WITH VIDEO
     if LOG_CHANNEL_ID:
+        try:
+            await forward_video_to_log(
+                context.bot,
+                LOG_CHANNEL_ID,
+                video_id,
+                user_id,
+                username,
+                video_caption
+            )
+            logger.info(f"✅ Video forwarded to log for user {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Video forward failed: {e}")
+        
+        # Also send text log
         try:
             await log_video_processed(
                 context.bot,
@@ -1186,7 +1221,11 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     watermark_color = watermark_settings.get("color", "#FFFFFF")
     watermark_shadow = watermark_settings.get("shadow_color", "#000000")
     
-    msg = await update.message.reply_text("⏳ Processing video...", reply_to_message_id=update.message.message_id, parse_mode="HTML")
+    msg = await update.message.reply_text(
+        "⏳ Processing video...",
+        reply_to_message_id=update.message.message_id,
+        parse_mode="HTML"
+    )
     
     video = update.message.video.file_id
     original_caption = update.message.caption or ""
