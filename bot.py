@@ -1108,6 +1108,9 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("⚠️ No thumbnail to remove\n\nSend a photo to create one now!", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
 
+# ============================================
+# REPLACE photo_handler WITH THIS
+# ============================================
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1116,16 +1119,18 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.message.from_user.username or "Unknown"
     photo_id = update.message.photo[-1].file_id
     
-    try:
-        await log_thumb_set(
-            context.bot,
-            LOG_CHANNEL_ID,
-            user_id,
-            username
-        )
-        logger.info(f"✅ Thumbnail log sent for user {user_id}")
-    except Exception as e:
-        logger.error(f"❌ Thumbnail log failed: {e}")
+    # ✅ SEND LOG TO CHANNEL
+    if LOG_CHANNEL_ID:
+        try:
+            await log_thumb_set(
+                context.bot,
+                LOG_CHANNEL_ID,
+                user_id,
+                username
+            )
+            logger.info(f"✅ Thumbnail log sent for user {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Thumbnail log failed: {e}")
     
     old_thumbnail = get_thumbnail(user_id)
     is_replace = old_thumbnail is not None
@@ -1141,6 +1146,9 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("✅ Thumbnail " + action_text + "\n\nReady! Send any video to apply cover", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
 
+# ============================================
+# REPLACE video_handler WITH THIS
+# ============================================
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1153,6 +1161,19 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not cover:
         return await update.message.reply_text("❌ No thumbnail found\n\nSend a photo to save thumbnail first", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
+    # ✅ SEND LOG TO CHANNEL - VIDEO PROCESSING START
+    if LOG_CHANNEL_ID:
+        try:
+            await log_video_processed(
+                context.bot,
+                LOG_CHANNEL_ID,
+                user_id,
+                username
+            )
+            logger.info(f"✅ Video log sent for user {user_id}")
+        except Exception as e:
+            logger.error(f"❌ Video log failed: {e}")
+    
     # ✅ WATERMARK SETTINGS
     watermark_settings = get_watermark_settings(user_id)
     watermark_enabled = watermark_settings.get("enabled", False)
@@ -1160,8 +1181,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     watermark_position = watermark_settings.get("position", "bottom-right")
     watermark_opacity = watermark_settings.get("opacity", 0.7)
     watermark_font_size = watermark_settings.get("font_size", 30)
-    watermark_color = watermark_settings.get("color", "#FFFFFF")  # ✅ NEW
-    watermark_shadow = watermark_settings.get("shadow_color", "#000000")  # ✅ NEW
+    watermark_color = watermark_settings.get("color", "#FFFFFF")
+    watermark_shadow = watermark_settings.get("shadow_color", "#000000")
     
     msg = await update.message.reply_text("⏳ Processing video...", reply_to_message_id=update.message.message_id, parse_mode="HTML")
     
@@ -1190,7 +1211,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 'first_name': first_name
             }
             
-            # Apply watermark with color
             watermarked_thumb_path = video_editor.add_watermark_to_thumbnail(
                 thumbnail_path=temp_thumb_path,
                 watermark_text=watermark_text,
@@ -1198,8 +1218,8 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 opacity=watermark_opacity,
                 font_size=watermark_font_size,
                 user_info=user_info,
-                text_color=watermark_color,  # ✅ NEW
-                shadow_color=watermark_shadow  # ✅ NEW
+                text_color=watermark_color,
+                shadow_color=watermark_shadow
             )
             
             if watermarked_thumb_path and os.path.exists(watermarked_thumb_path):
