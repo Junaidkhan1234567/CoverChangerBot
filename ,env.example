@@ -31,7 +31,7 @@ MONGODB_DATABASE=video_cover_bot
 
 # ─── LOGGING ───
 # Channel ID where all user actions are logged
-LOG_CHANNEL_ID=-1002659719637
+LOG_CHANNEL_ID=-1002016227618
 
 # ─── REPOSITORY (Optional - for auto-updates) ───
 # GitHub repository URL
