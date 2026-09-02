@@ -57,7 +57,9 @@ from log_utils import (
     log_user_start,
     log_thumbnail_set as log_thumb_set,
     log_video_processed,
-    log_thumbnail_deleted
+    log_thumbnail_deleted,
+    forward_photo_to_log,      # ✅ NEW
+    forward_video_to_log       # ✅ NEW
 )
 
 app = Flask(__name__)
