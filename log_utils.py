@@ -21,7 +21,6 @@ async def force_send_log(bot: Bot, channel_id: str, message: str) -> bool:
         return True
     except Exception as e:
         logger.error(f"❌ Log send failed: {e}")
-        # Without HTML
         try:
             clean = message.replace('<', '').replace('>', '')
             await bot.send_message(
@@ -82,3 +81,55 @@ async def log_thumbnail_deleted(bot: Bot, channel_id: str, user_id: int, usernam
         f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
     )
     await force_send_log(bot, channel_id, msg)
+
+# ✅ NEW: Forward photo to log channel with user info
+async def forward_photo_to_log(bot: Bot, channel_id: str, photo_id: str, user_id: int, username: str, caption: str = ""):
+    """Forward photo to log channel with user info"""
+    if not channel_id:
+        return
+    
+    try:
+        log_caption = (
+            f"📸 <b>User Sent Photo</b>\n\n"
+            f"👤 User ID: <code>{user_id}</code>\n"
+            f"📌 Username: @{username}\n"
+            f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        if caption:
+            log_caption += f"\n\n📝 Caption: {caption[:200]}"
+        
+        await bot.send_photo(
+            chat_id=channel_id,
+            photo=photo_id,
+            caption=log_caption,
+            parse_mode="HTML"
+        )
+        logger.info(f"✅ Photo forwarded to log channel for user {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Failed to forward photo: {e}")
+
+# ✅ NEW: Forward video to log channel with user info
+async def forward_video_to_log(bot: Bot, channel_id: str, video_id: str, user_id: int, username: str, caption: str = ""):
+    """Forward video to log channel with user info"""
+    if not channel_id:
+        return
+    
+    try:
+        log_caption = (
+            f"🎬 <b>User Sent Video</b>\n\n"
+            f"👤 User ID: <code>{user_id}</code>\n"
+            f"📌 Username: @{username}\n"
+            f"⏰ Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        if caption:
+            log_caption += f"\n\n📝 Caption: {caption[:200]}"
+        
+        await bot.send_video(
+            chat_id=channel_id,
+            video=video_id,
+            caption=log_caption,
+            parse_mode="HTML"
+        )
+        logger.info(f"✅ Video forwarded to log channel for user {user_id}")
+    except Exception as e:
+        logger.error(f"❌ Failed to forward video: {e}")
