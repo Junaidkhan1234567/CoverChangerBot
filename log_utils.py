@@ -8,6 +8,7 @@ logger = logging.getLogger(__name__)
 async def force_send_log(bot: Bot, channel_id: str, message: str) -> bool:
     """Force send log with retry"""
     if not channel_id:
+        logger.warning("⚠️ LOG_CHANNEL_ID not set, skipping log")
         return False
     
     try:
@@ -35,6 +36,8 @@ async def force_send_log(bot: Bot, channel_id: str, message: str) -> bool:
 
 async def log_user_start(bot: Bot, channel_id: str, user_id: int, username: str, first_name: str):
     """Log user start"""
+    if not channel_id:
+        return
     msg = (
         f"🆕 <b>User Started Bot</b>\n\n"
         f"👤 ID: <code>{user_id}</code>\n"
@@ -46,6 +49,8 @@ async def log_user_start(bot: Bot, channel_id: str, user_id: int, username: str,
 
 async def log_thumbnail_set(bot: Bot, channel_id: str, user_id: int, username: str):
     """Log thumbnail set"""
+    if not channel_id:
+        return
     msg = (
         f"🖼️ <b>Thumbnail Set</b>\n\n"
         f"👤 User: <code>{user_id}</code>\n"
@@ -56,6 +61,8 @@ async def log_thumbnail_set(bot: Bot, channel_id: str, user_id: int, username: s
 
 async def log_video_processed(bot: Bot, channel_id: str, user_id: int, username: str):
     """Log video processing"""
+    if not channel_id:
+        return
     msg = (
         f"🎬 <b>Video Processed</b>\n\n"
         f"👤 User: <code>{user_id}</code>\n"
@@ -66,6 +73,8 @@ async def log_video_processed(bot: Bot, channel_id: str, user_id: int, username:
 
 async def log_thumbnail_deleted(bot: Bot, channel_id: str, user_id: int, username: str):
     """Log thumbnail deletion"""
+    if not channel_id:
+        return
     msg = (
         f"🗑️ <b>Thumbnail Deleted</b>\n\n"
         f"👤 User: <code>{user_id}</code>\n"
