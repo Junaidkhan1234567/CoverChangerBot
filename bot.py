@@ -128,10 +128,13 @@ def get_force_banner():
 
 verified_users = set()
 
-"""══════════════════ LOGGING HELPER ══════════════════"""
+# ============================================
+# REPLACE send_log function WITH THIS
+# ============================================
 async def send_log(context: ContextTypes.DEFAULT_TYPE, log_message: str) -> bool:
+    """Send log to LOG_CHANNEL_ID"""
     if not LOG_CHANNEL_ID:
-        logger.debug("LOG_CHANNEL_ID not configured")
+        logger.warning("⚠️ LOG_CHANNEL_ID not configured - log not sent")
         return False
     
     try:
