@@ -4,15 +4,14 @@ import logging
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, CommandHandler, MessageHandler, filters, CallbackQueryHandler
 from telegram.error import BadRequest
-from database import users_collection, DB_AVAILABLE
+from database import db
 
 logger = logging.getLogger(__name__)
 
 # ═══════════════════ DATABASE FUNCTIONS ═══════════════════
 def get_user_channel(user_id: int) -> str:
-    if not DB_AVAILABLE:
-        return None
     try:
+        users_collection = db.get_collection("users")
         user_data = users_collection.find_one({"user_id": user_id})
         if user_data and "channel_id" in user_data:
             return user_data["channel_id"]
@@ -22,9 +21,8 @@ def get_user_channel(user_id: int) -> str:
         return None
 
 def get_forward_enabled(user_id: int) -> bool:
-    if not DB_AVAILABLE:
-        return True
     try:
+        users_collection = db.get_collection("users")
         user_data = users_collection.find_one({"user_id": user_id})
         if user_data and "forward_enabled" in user_data:
             return user_data["forward_enabled"]
@@ -37,9 +35,8 @@ def should_forward_to_channel(user_id: int) -> bool:
     return get_forward_enabled(user_id)
 
 def save_user_channel(user_id: int, channel_id: str) -> None:
-    if not DB_AVAILABLE:
-        return
     try:
+        users_collection = db.get_collection("users")
         if channel_id is None:
             users_collection.update_one(
                 {"user_id": user_id},
@@ -57,9 +54,8 @@ def save_user_channel(user_id: int, channel_id: str) -> None:
         logger.error(f"Error saving channel: {e}")
 
 def save_forward_enabled(user_id: int, enabled: bool) -> None:
-    if not DB_AVAILABLE:
-        return
     try:
+        users_collection = db.get_collection("users")
         users_collection.update_one(
             {"user_id": user_id},
             {"$set": {"forward_enabled": enabled}},
@@ -102,14 +98,27 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
     text += "2️⃣ Copy the ID starting with -100\n\n"
     text += "⚠️ Make sure bot is admin in your channel!"
     
+    # ✅ COLORED BUTTONS
     toggle_text = "📤 Forward ON" if forward_enabled else "📤 Forward OFF"
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove"),
+            InlineKeyboardButton(
+                toggle_text,
+                callback_data="channel_toggle_forward",
+                style="success" if forward_enabled else "danger"  # GREEN if ON, RED if OFF
+            ),
+            InlineKeyboardButton(
+                "🗑️ Remove Channel",
+                callback_data="channel_remove",
+                style="danger"  # 🔴 RED
+            ),
         ],
         [
-            InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings"),
+            InlineKeyboardButton(
+                "⬅️ Back to Settings",
+                callback_data="menu_settings",
+                style="primary"  # 🔵 BLUE
+            ),
         ]
     ])
     
@@ -138,7 +147,7 @@ async def channel_set_prompt(update: Update, context: ContextTypes.DEFAULT_TYPE)
         logger.error(f"Error in channel set prompt: {e}")
 
 async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Toggle forward enabled/disabled"""
+    """Toggle forward enabled/disabled - WITH COLOR"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -173,11 +182,23 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
     toggle_text = "📤 Forward ON" if new_status else "📤 Forward OFF"
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton(toggle_text, callback_data="channel_toggle_forward"),
-            InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove"),
+            InlineKeyboardButton(
+                toggle_text,
+                callback_data="channel_toggle_forward",
+                style="success" if new_status else "danger"  # GREEN if ON, RED if OFF
+            ),
+            InlineKeyboardButton(
+                "🗑️ Remove Channel",
+                callback_data="channel_remove",
+                style="danger"  # 🔴 RED
+            ),
         ],
         [
-            InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings"),
+            InlineKeyboardButton(
+                "⬅️ Back to Settings",
+                callback_data="menu_settings",
+                style="primary"  # 🔵 BLUE
+            ),
         ]
     ])
     
@@ -193,7 +214,7 @@ async def channel_toggle_forward(update: Update, context: ContextTypes.DEFAULT_T
         logger.error(f"Error toggling forward: {e}")
 
 async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove saved channel"""
+    """Remove saved channel - WITH RED BUTTONS"""
     query = update.callback_query
     user_id = query.from_user.id
     
@@ -213,7 +234,11 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("🏠 Back to Home", callback_data="channel_back_home"),
+                InlineKeyboardButton(
+                    "🏠 Back to Home",
+                    callback_data="channel_back_home",
+                    style="danger"  # 🔴 RED
+                ),
             ]
         ])
         
@@ -239,7 +264,11 @@ async def channel_remove(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings"),
+                InlineKeyboardButton(
+                    "⬅️ Back to Settings",
+                    callback_data="menu_settings",
+                    style="danger"  # 🔴 RED
+                ),
             ]
         ])
         
@@ -308,7 +337,11 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
         )
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings"),
+                InlineKeyboardButton(
+                    "⬅️ Back to Settings",
+                    callback_data="menu_settings",
+                    style="primary"  # 🔵 BLUE
+                ),
             ]
         ])
         
@@ -341,11 +374,23 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("📤 Forward ON", callback_data="channel_toggle_forward"),
-                    InlineKeyboardButton("🗑️ Remove Channel", callback_data="channel_remove"),
+                    InlineKeyboardButton(
+                        "📤 Forward ON",
+                        callback_data="channel_toggle_forward",
+                        style="danger"  # 🔴 RED (Initially OFF)
+                    ),
+                    InlineKeyboardButton(
+                        "🗑️ Remove Channel",
+                        callback_data="channel_remove",
+                        style="danger"  # 🔴 RED
+                    ),
                 ],
                 [
-                    InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings"),
+                    InlineKeyboardButton(
+                        "⬅️ Back to Settings",
+                        callback_data="menu_settings",
+                        style="primary"  # 🔵 BLUE
+                    ),
                 ]
             ])
             
@@ -382,7 +427,11 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
             
             keyboard = InlineKeyboardMarkup([
                 [
-                    InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings"),
+                    InlineKeyboardButton(
+                        "⬅️ Back to Settings",
+                        callback_data="menu_settings",
+                        style="primary"  # 🔵 BLUE
+                    ),
                 ]
             ])
             
@@ -406,7 +455,11 @@ async def handle_channel_id_input(update: Update, context: ContextTypes.DEFAULT_
         )
         keyboard = InlineKeyboardMarkup([
             [
-                InlineKeyboardButton("⬅️ Back to Settings", callback_data="menu_settings"),
+                InlineKeyboardButton(
+                    "⬅️ Back to Settings",
+                    callback_data="menu_settings",
+                    style="primary"  # 🔵 BLUE
+                ),
             ]
         ])
         

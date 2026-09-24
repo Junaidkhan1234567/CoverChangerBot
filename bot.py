@@ -28,11 +28,7 @@ from database import (
     is_user_verified,
     set_user_verified,
     get_watermark_settings,
-    save_watermark_settings,
-    save_user,           # ✅ NEW
-    get_all_user_ids,    # ✅ NEW
-    users_collection,    # ✅ NEW
-    DB_AVAILABLE         # ✅ NEW
+    save_watermark_settings
 )
 from telegram import MessageEntity
 from flask import Flask
@@ -62,8 +58,8 @@ from log_utils import (
     log_thumbnail_set as log_thumb_set,
     log_video_processed,
     log_thumbnail_deleted,
-    forward_photo_to_log,
-    forward_video_to_log
+    forward_photo_to_log,      # ✅ NEW
+    forward_video_to_log       # ✅ NEW
 )
 
 app = Flask(__name__)
@@ -134,9 +130,8 @@ def get_force_banner():
 
 verified_users = set()
 
-
 # ============================================
-# LOG SENDER
+# REPLACE send_log function WITH THIS
 # ============================================
 async def send_log(context: ContextTypes.DEFAULT_TYPE, log_message: str) -> bool:
     """Send log to LOG_CHANNEL_ID"""
@@ -454,12 +449,6 @@ async def callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     user_id = query.from_user.id
-    username = query.from_user.username or "Unknown"
-    first_name = query.from_user.first_name or "User"
-    
-    # ✅ SAVE USER TO DB (for broadcast)
-    save_user(user_id, username, first_name)
-    
     logger.info(f"👤 User ID: {user_id} | Channel ID Config: {FORCE_SUB_CHANNEL_ID}")
     
     # ═══════════════════ CHANNEL SETTINGS CALLBACKS ═══════════════════
@@ -945,9 +934,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = update.effective_user.username or "Unknown"
     first_name = update.effective_user.first_name or "User"
     
-    # ✅ SAVE USER TO DB (for broadcast)
-    save_user(user_id, username, first_name)
-    
     is_new_user = not is_user_exists(user_id)
     
     if is_new_user:
@@ -985,12 +971,6 @@ async def show_thumbnail_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     
     user_id = update.message.from_user.id
-    username = update.message.from_user.username or "Unknown"
-    first_name = update.message.from_user.first_name or "User"
-    
-    # ✅ SAVE USER TO DB
-    save_user(user_id, username, first_name)
-    
     photo_id = get_thumbnail(user_id)
     
     if photo_id:
@@ -1080,12 +1060,6 @@ async def settings(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
     user_id = update.message.from_user.id
-    username = update.message.from_user.username or "Unknown"
-    first_name = update.message.from_user.first_name or "User"
-    
-    # ✅ SAVE USER TO DB
-    save_user(user_id, username, first_name)
-    
     thumb_status = "✅ Saved & Ready" if has_thumbnail(user_id) else "❌ Not saved yet"
     ist_time = get_ist_datetime_str()
     
@@ -1114,10 +1088,6 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "Unknown"
-    first_name = update.message.from_user.first_name or "User"
-    
-    # ✅ SAVE USER TO DB
-    save_user(user_id, username, first_name)
     
     if delete_thumbnail(user_id):
         try:
@@ -1139,18 +1109,12 @@ async def remover(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text("⚠️ No thumbnail to remove\n\nSend a photo to create one now!", reply_to_message_id=update.message.message_id, parse_mode="HTML")
 
-
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
     
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "Unknown"
-    first_name = update.message.from_user.first_name or "User"
-    
-    # ✅ SAVE USER TO DB
-    save_user(user_id, username, first_name)
-    
     photo_id = update.message.photo[-1].file_id
     caption = update.message.caption or ""
     
@@ -1169,6 +1133,7 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"❌ Photo forward failed: {e}")
         
+        # Also send text log
         try:
             await log_thumb_set(
                 context.bot,
@@ -1198,6 +1163,9 @@ async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+# ============================================
+# REPLACE video_handler WITH THIS
+# ============================================
 async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
@@ -1205,10 +1173,6 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     username = update.message.from_user.username or "No Username"
     first_name = update.message.from_user.first_name or "User"
-    
-    # ✅ SAVE USER TO DB
-    save_user(user_id, username, first_name)
-    
     video_id = update.message.video.file_id
     video_caption = update.message.caption or ""
     cover = get_thumbnail(user_id)
@@ -1235,6 +1199,7 @@ async def video_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         except Exception as e:
             logger.error(f"❌ Video forward failed: {e}")
         
+        # Also send text log
         try:
             await log_video_processed(
                 context.bot,
@@ -1557,21 +1522,6 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Error: " + str(e))
 
 
-# ═══════════════════════════════════════════════════════
-# ✅ BROADCAST with LIVE PROGRESS
-# ═══════════════════════════════════════════════════════
-
-def _create_progress_bar(current: int, total: int, length: int = 15) -> str:
-    """Create visual progress bar"""
-    if total == 0:
-        return "░" * length
-    filled = int((current / total) * length)
-    empty = length - filled
-    percent = (current / total) * 100
-    bar = "█" * filled + "░" * empty
-    return f"<code>{bar}</code> {percent:.1f}%"
-
-
 async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_admin(update):
         return
@@ -1590,143 +1540,78 @@ async def broadcast_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     message_text = args[1]
     
-    # ✅ Get ALL users who ever used the bot
-    all_user_ids = get_all_user_ids()
-    
-    if not all_user_ids:
-        return await update.message.reply_text(
-            "❌ <b>No users found in database</b>\n\n"
-            "💡 Users are saved when they /start or use the bot",
-            parse_mode="HTML"
-        )
-    
-    total_users = len(all_user_ids)
-    
-    # ✅ Initial progress message
-    msg = await update.message.reply_text(
-        f"📢 <b>Broadcast Started</b>\n\n"
-        f"👥 Total users: <b>{total_users}</b>\n"
-        f"📝 Message:\n<code>{message_text[:200]}</code>\n\n"
-        f"⏳ <b>Progress:</b> 0 / {total_users}\n"
-        f"📊 <b>Sent:</b> 0 | ❌ <b>Failed:</b> 0",
-        parse_mode="HTML"
+    confirm_text = (
+        "📢 Broadcast Confirmation\n\n"
+        f"📝 Message:\n"
+        f"{message_text}\n\n"
+        f"👥 Total users: {get_total_users()}\n\n"
+        "⚠️ Processing... sending now"
     )
+    msg = await update.message.reply_text(confirm_text, parse_mode="HTML")
     
-    sent = 0
-    failed = 0
-    blocked = 0
-    deleted = 0
-    other_failed = 0
-    processed = 0
-    
-    start_time = datetime.now()
-    
-    for user_id in all_user_ids:
-        try:
-            await context.bot.send_message(
-                chat_id=user_id,
-                text=f"📢 <b>Announcement</b>\n\n{message_text}",
+    try:
+        from database import db
+        users_collection = db.get_collection("users")
+        all_users = users_collection.find({}, {"user_id": 1})
+        
+        user_ids = [user["user_id"] for user in all_users if "user_id" in user]
+        
+        if not user_ids:
+            await msg.edit_text(
+                "❌ No users found\n\n"
+                "💡 Database might be empty",
                 parse_mode="HTML"
             )
-            sent += 1
-            
-            # Update last_broadcast timestamp
-            if DB_AVAILABLE and users_collection is not None:
-                try:
-                    users_collection.update_one(
-                        {"user_id": user_id},
-                        {"$set": {"last_broadcast": datetime.now()}}
-                    )
-                except Exception:
-                    pass
-            
-            # ✅ Rate limit safe: 20 msgs/sec
-            await asyncio.sleep(0.05)
-            
-        except Exception as e:
-            error_str = str(e).lower()
-            if "blocked" in error_str or "user is blocked" in error_str:
-                blocked += 1
-            elif "deactivated" in error_str or "user is deactivated" in error_str:
-                deleted += 1
-            elif "chat not found" in error_str:
-                deleted += 1
-            else:
-                other_failed += 1
-                logger.warning(f"Broadcast failed for {user_id}: {e}")
-            failed += 1
+            return
         
-        processed += 1
+        sent = 0
+        failed = 0
         
-        # ✅ LIVE PROGRESS UPDATE every 20 users
-        if processed % 20 == 0 or processed == total_users:
+        for user_id in user_ids:
             try:
-                elapsed = (datetime.now() - start_time).total_seconds()
-                speed = processed / elapsed if elapsed > 0 else 0
-                remaining = (total_users - processed) / speed if speed > 0 else 0
-                
-                progress_bar = _create_progress_bar(processed, total_users)
-                percent = (processed / total_users) * 100
-                
-                progress_text = (
-                    f"📢 <b>Broadcast In Progress...</b>\n\n"
-                    f"👥 Total users: <b>{total_users}</b>\n\n"
-                    f"{progress_bar}\n"
-                    f"📊 <b>Progress:</b> {processed} / {total_users} ({percent:.1f}%)\n\n"
-                    f"✅ <b>Sent:</b> {sent}\n"
-                    f"🚫 <b>Blocked:</b> {blocked}\n"
-                    f"👻 <b>Deleted:</b> {deleted}\n"
-                    f"❌ <b>Other failed:</b> {other_failed}\n\n"
-                    f"⚡ <b>Speed:</b> {speed:.1f} msg/sec\n"
-                    f"⏱️ <b>ETA:</b> {int(remaining)} sec"
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=f"📢 <b>Announcement from Admin</b>\n\n{message_text}",
+                    parse_mode="HTML"
                 )
-                
-                await msg.edit_text(progress_text, parse_mode="HTML")
-                
-            except Exception as edit_err:
-                logger.debug(f"Progress update error: {edit_err}")
-                pass
-    
-    # ✅ Final result
-    total = sent + failed
-    success_rate = (sent / total * 100) if total > 0 else 0
-    elapsed_total = (datetime.now() - start_time).total_seconds()
-    
-    result_text = (
-        f"✅ <b>Broadcast Completed</b>\n\n"
-        f"📤 <b>Sent:</b> {sent}\n"
-        f"🚫 <b>Blocked:</b> {blocked}\n"
-        f"👻 <b>Deleted:</b> {deleted}\n"
-        f"❌ <b>Other failed:</b> {other_failed}\n"
-        f"👥 <b>Total:</b> {total}\n\n"
-        f"📊 <b>Success Rate:</b> {success_rate:.1f}%\n"
-        f"⏱️ <b>Time Taken:</b> {int(elapsed_total)} sec"
-    )
-    
-    await msg.edit_text(result_text, parse_mode="HTML")
-    
-    # Log to channel
-    if LOG_CHANNEL_ID:
-        log_text = (
-            f"📢 <b>Broadcast Sent</b>\n\n"
-            f"👤 Admin: @{update.message.from_user.username or update.message.from_user.id}\n"
-            f"📤 Sent: {sent} | ❌ Failed: {failed}\n"
-            f"📊 Success: {success_rate:.1f}%\n"
-            f"📝 Message:\n{message_text[:200]}"
+                sent += 1
+            except Exception as e:
+                logger.warning(f"Could not send broadcast to user {user_id}: {e}")
+                failed += 1
+        
+        result_text = (
+            "✅ Broadcast Completed\n\n"
+            f"📤 Sent: {sent}\n"
+            f"❌ Failed: {failed}\n"
+            f"👥 Total: {sent + failed}\n\n"
+            f"📊 Success: {(sent/(sent+failed)*100):.1f}%"
         )
-        await send_log(context, log_text)
+        
+        await msg.edit_text(result_text, parse_mode="HTML")
+        
+        if LOG_CHANNEL_ID:
+            log_text = (
+                f"📢 <b>Broadcast Sent</b>\n\n"
+                f"👤 Admin: @{update.message.from_user.username or update.message.from_user.id}\n"
+                f"📤 Messages Sent: {sent}\n"
+                f"❌ Failed: {failed}\n"
+                f"📝 Message:\n{message_text}"
+            )
+            await send_log(context, log_text)
+        
+    except Exception as e:
+        await msg.edit_text(
+            f"❌ Broadcast failed\n\n"
+            f"Error: {str(e)[:100]}\n\n"
+            "Check logs for more details.",
+            parse_mode="HTML"
+        )
+        logger.error(f"Broadcast error: {e}", exc_info=True)
 
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await check_force_sub(update, context):
         return
-    
-    user_id = update.effective_user.id
-    username = update.effective_user.username or "Unknown"
-    first_name = update.effective_user.first_name or "User"
-    
-    # ✅ SAVE USER TO DB
-    save_user(user_id, username, first_name)
     
     if await handle_channel_id_input(update, context):
         return
@@ -1738,10 +1623,6 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def post_init(app: Application):
     logger.info("🚀 Bot is starting up...")
-    
-    # ✅ Track start time
-    import time
-    app.bot_data['start_time'] = time.time()
     
     if LOG_CHANNEL_ID:
         try:
@@ -1794,7 +1675,7 @@ def main() -> None:
     app.post_init = post_init
 
     register_channel_handlers(app)
-    register_watermark_handlers(app)
+    register_watermark_handlers(app)  # ✅ WATERMARK HANDLERS REGISTER
 
     app.add_handler(CommandHandler("start", start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("help", help_cmd, filters=filters.ChatType.PRIVATE))
