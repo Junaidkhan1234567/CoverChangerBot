@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters, CommandHandler
-from database import db
+from database import users_collection, DB_AVAILABLE
 
 logger = logging.getLogger(__name__)
 
@@ -14,8 +14,17 @@ logger = logging.getLogger(__name__)
 
 def get_watermark_settings(user_id: int) -> dict:
     """Get watermark settings for user"""
+    if not DB_AVAILABLE:
+        return {
+            "enabled": False,
+            "text": "© {username} • Cover Bot",
+            "position": "bottom-right",
+            "opacity": 0.7,
+            "font_size": 30,
+            "color": "#FFFFFF",
+            "shadow_color": "#000000"
+        }
     try:
-        users_collection = db.get_collection("users")
         user_data = users_collection.find_one({"user_id": user_id})
         if user_data and "watermark" in user_data:
             return user_data["watermark"]
@@ -42,8 +51,9 @@ def get_watermark_settings(user_id: int) -> dict:
 
 def save_watermark_settings(user_id: int, settings: dict) -> bool:
     """Save watermark settings for user"""
+    if not DB_AVAILABLE:
+        return False
     try:
-        users_collection = db.get_collection("users")
         users_collection.update_one(
             {"user_id": user_id},
             {"$set": {"watermark": settings}},
@@ -503,33 +513,18 @@ async def cancel_watermark_setup(update: Update, context: ContextTypes.DEFAULT_T
 def register_watermark_handlers(app):
     """Register all watermark-related handlers with the bot application"""
     
-    # Main watermark menu handler
     app.add_handler(CallbackQueryHandler(watermark_menu_callback, pattern="^watermark_settings$"))
-    
-    # Toggle handler
     app.add_handler(CallbackQueryHandler(watermark_toggle_callback, pattern="^watermark_toggle$"))
-    
-    # Text handlers
     app.add_handler(CallbackQueryHandler(watermark_set_text_callback, pattern="^watermark_set_text$"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_watermark_text_input), group=21)
-    
-    # Position handlers
     app.add_handler(CallbackQueryHandler(watermark_position_callback, pattern="^watermark_position$"))
     app.add_handler(CallbackQueryHandler(watermark_position_set_callback, pattern="^watermark_pos_"))
-    
-    # Opacity handlers
     app.add_handler(CallbackQueryHandler(watermark_opacity_callback, pattern="^watermark_opacity$"))
     app.add_handler(CallbackQueryHandler(watermark_opacity_set_callback, pattern="^watermark_op_"))
-    
-    # Font size handlers
     app.add_handler(CallbackQueryHandler(watermark_font_size_callback, pattern="^watermark_font_size$"))
     app.add_handler(CallbackQueryHandler(watermark_font_size_set_callback, pattern="^watermark_font_"))
-    
-    # Color handlers
     app.add_handler(CallbackQueryHandler(watermark_color_callback, pattern="^watermark_color$"))
     app.add_handler(CallbackQueryHandler(watermark_color_set_callback, pattern="^watermark_color_"))
-    
-    # Cancel handler
     app.add_handler(CommandHandler("cancel", cancel_watermark_setup))
     
     logger.info("✅ Watermark handlers registered successfully")
