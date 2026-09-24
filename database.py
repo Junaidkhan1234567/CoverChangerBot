@@ -24,6 +24,52 @@ except Exception as e:
     users_collection = None
 
 
+# ═══════════════════════════════════════════════════════
+# USER SAVE / FETCH (FOR BROADCAST)
+# ═══════════════════════════════════════════════════════
+
+def save_user(user_id: int, username: str = None, first_name: str = None) -> bool:
+    """Save/update user in database — called on every user interaction"""
+    if not DB_AVAILABLE:
+        return False
+    try:
+        users_collection.update_one(
+            {"user_id": user_id},
+            {
+                "$set": {
+                    "user_id": user_id,
+                    "username": username,
+                    "first_name": first_name,
+                    "last_seen": datetime.now()
+                },
+                "$setOnInsert": {
+                    "created_at": datetime.now()
+                }
+            },
+            upsert=True
+        )
+        return True
+    except Exception as e:
+        logger.error(f"❌ Error saving user {user_id}: {e}")
+        return False
+
+
+def get_all_user_ids() -> list:
+    """Get ALL user IDs who ever used the bot"""
+    if not DB_AVAILABLE:
+        return []
+    try:
+        users = users_collection.find({}, {"user_id": 1})
+        return [u["user_id"] for u in users if "user_id" in u]
+    except Exception as e:
+        logger.error(f"❌ Error getting all users: {e}")
+        return []
+
+
+# ═══════════════════════════════════════════════════════
+# THUMBNAIL FUNCTIONS
+# ═══════════════════════════════════════════════════════
+
 def save_thumbnail(user_id: int, photo_id: str) -> bool:
     if not DB_AVAILABLE:
         return False
@@ -84,6 +130,10 @@ def has_thumbnail(user_id: int) -> bool:
         return False
 
 
+# ═══════════════════════════════════════════════════════
+# BAN / UNBAN
+# ═══════════════════════════════════════════════════════
+
 def ban_user(user_id: int, reason: str = "No reason") -> bool:
     if not DB_AVAILABLE:
         return False
@@ -137,6 +187,10 @@ def is_user_banned(user_id: int) -> bool:
         return False
 
 
+# ═══════════════════════════════════════════════════════
+# STATS
+# ═══════════════════════════════════════════════════════
+
 def get_total_users() -> int:
     if not DB_AVAILABLE:
         return 0
@@ -182,7 +236,7 @@ def is_user_exists(user_id: int) -> bool:
 
 
 # ═══════════════════════════════════════════════════════
-# WATERMARK FUNCTIONS - NEW
+# WATERMARK FUNCTIONS
 # ═══════════════════════════════════════════════════════
 
 def get_watermark_settings(user_id: int) -> dict:
